@@ -171,7 +171,7 @@ Once you have completed the final step, all students' accounts and testbeds will
 
 ## Grading Your Students 📊
 
-A script for grading will be available in a future update.
+A grading script is available in our private `sphere_instructors` repository. Please contact us below if you'd like permission to access this repo.
 
 ## Features For Students 🌟
 

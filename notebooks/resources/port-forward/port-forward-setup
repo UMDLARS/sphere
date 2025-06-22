@@ -23,7 +23,7 @@ if [[ -z $pass ]]; then
     exit 1
 fi
 
-mrg config set server grpc.mod.deterlab.net
+mrg config set server grpc.sphere-testbed.net
 
 echo "Logging $user into Merge"
 mrg login $user -p $pass
@@ -44,11 +44,11 @@ touch config
 
 # Creating the config file:
 echo "Host mergejump
-    Hostname jump.mod.deterlab.net
-	Port 2022
-	User $user
-	IdentityFile ~/.ssh/merge_key
-	ServerAliveInterval 30
+    Hostname jump.sphere-testbed.net
+    Port 2022
+    User $user
+    IdentityFile ~/.ssh/merge_key
+    ServerAliveInterval 30
 
 Host $user-$xdc
     ProxyJump mergejump
@@ -81,7 +81,7 @@ cd ~
 rm -rf ~/port-forwarding-data/
 
 # Move the zip file to the notebooks directory.
-mv ~/port-forward-data.zip /project/USERNAME_GOES_HERE/notebooks/
+mv ~/port-forward-data.zip ~
 
 RED='\033[0;31m' # Red Font
 GREEN='\033[0;32m' # Green Font
