@@ -6,6 +6,7 @@ import os
 def check_perms(path):
     mode = os.stat(path).st_mode
     permissions = oct(mode)[-3:]
+
     # Permissions were not changed from default.
     if (permissions == '644'):
         sys.exit(2)
@@ -39,8 +40,17 @@ def main():
                     # File was created. Check if perms were made.
                     if os.path.exists("/home/.checker/step2_perms.txt"):
                         sys.exit(0)
+
+                    # Otherwise, if the file doesn't exist yet, we will check the logs.
+                    elif (not os.path.exists(path) and \
+                          "/home/umdclassiolq/jupyterintro/ ATTRIB jupytertest.txt" in log_contents):
+                        sys.exit(0)
+
+                    # File exists, so we will check it directly.
                     else:
                         check_perms(path)
+
+                # Perms were never changed.
                 else:
                     sys.exit(1)
 
