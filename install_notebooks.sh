@@ -29,7 +29,7 @@ echo "Installing required Jupyter extensions."
 # This "sed" command is a workaround, but apparently doesn't fix the issue when installing ipywidgets.
 sudo sed -i "s|include-system-site-packages = false|include-system-site-packages = true|g" /usr/local/jupyter/venv/pyvenv.cfg
 source /usr/local/jupyter/venv/bin/activate
-sudo pip install -q ipywidgets jupyterlab_widgets 2>/dev/null
+pip install -q ipywidgets jupyterlab_widgets 2>/dev/null
 deactivate
 
 echo "Beginning installation of notebooks."
