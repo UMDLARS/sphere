@@ -4,7 +4,7 @@ export USER="$(whoami)"
 export LABS="/home/$USER"
 export RESOURCES="$LABS/resources"
 export SAVES="$LABS/saves"
-export EDUCATION="/home/niete018/.education"
+export EDUCATION="/home/$USER/.education"
 
 # Check if the student is running as root.
 if [ "$EUID" -eq 0 ]; then
@@ -67,15 +67,15 @@ sudo rsync -a --delete --exclude='saves/' --exclude='pass.txt' --exclude='.local
 mkdir -p $LABS/saves
 
 # Move the lab resources.
-if [ -d "/home/niete018/.education" ]; then
+if [ -d "/home/$USER/.education" ]; then
     echo -e "\033[0;31mLab resources for your notebooks already exist. Applying updates...\033[0m"
 
     # Delete the education directory so that it can be updated. mv will not work if there are already files.
-    sudo rm -rf /home/niete018/.education/*
+    sudo rm -rf /home/$USER/.education/*
 else
     echo -e "\033[0;31mLab resources do not exist on your XDC. Creating them...\033[0m"
-    sudo mkdir -p "/home/niete018/.education"
-    sudo chown -R "$USER:$USER" "/home/niete018/.education"
+    sudo mkdir -p "/home/$USER/.education"
+    sudo chown -R "$USER:$USER" "/home/$USER/.education"
 fi
 
 # Find and copy all directories ending with 'jup' to the $EDUCATION directory.
@@ -89,8 +89,8 @@ done
 
 # Finally, copy all of the notebook function files (should be four of them) into the student's XDC.
 sudo mv runlab startexp stopexp runr /home
-sudo mv grader.py /home/niete018/.education
-sudo chmod a+x /home/runlab /home/startexp /home/stopexp /home/runr /home/niete018/.education/grader.py
+sudo mv grader.py /home/$USER/.education
+sudo chmod a+x /home/runlab /home/startexp /home/stopexp /home/runr /home/$USER/.education/grader.py
 
 # Cleanup temporary directory.
 rm -rf "$TEMP_DIR"
@@ -113,6 +113,6 @@ popd > /dev/null 2>&1
 sed -i "s/USERNAME_GOES_HERE/$USER/g" "$LABS/resources/firewall/section_4.py"
 
 # And finally, for the install scripts.
-find /home/niete018/.education -type f -name install -exec sed -i "s/USERNAME_GOES_HERE/$(whoami)/g" {} +
+find /home/$USER/.education -type f -name install -exec sed -i "s/USERNAME_GOES_HERE/$(whoami)/g" {} +
 
 echo -e "\033[0;32mDone. You can find your notebooks in $LABS. Please refresh your browser's tab before starting a lab.\033[0m"
