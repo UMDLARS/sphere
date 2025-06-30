@@ -48,7 +48,7 @@ def trigger_load(labname):
     return result_queue.get()
 
 def warn_student(labname):
-    warning_path = f"/project/niete018/notebooks/saves/.{labname}_WARNING"
+    warning_path = f"/project/niete018/notebooks/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
