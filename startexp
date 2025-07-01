@@ -26,7 +26,7 @@ proj=$user
 lab=${@: -1} 
 exp=$lab
 run=0
-labpath="/home/.education"
+labpath="/home/$USER/.education"
 org=""
 while getopts ${OPTSTRING} opt; do    
   case ${opt} in
@@ -266,3 +266,4 @@ fi
 if [ $run -eq 1 ] ; then
     runlab $org $lab
 fi
+

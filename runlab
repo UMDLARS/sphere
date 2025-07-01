@@ -13,7 +13,7 @@ if [ $# -lt 1 ] ; then
    exit 1;
 fi
 lab=${@: -1} 
-labpath="/home/.education"
+labpath="/home/$USER/.education"
 while getopts ${OPTSTRING} opt; do
    case ${opt} in
       o)
