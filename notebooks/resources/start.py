@@ -24,7 +24,7 @@ class LabInitial(Enum):
 def save_notebook(labname):
     with save_lock:
         subprocess.run([
-            '/home/umdclassuhad/resources/save.py', labname
+            '/home/USERNAME_GOES_HERE/resources/save.py', labname
         ], capture_output=True, text=True)
 
 def trigger_save(labname, question=None, response=None, answer=""):
@@ -34,7 +34,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     if answer:
         answer = re.sub(r"[\"'`]", "", str(answer))
     
-    cmd_args = ["/home/umdclassuhad/.education/grader.py", LabInitial(labname).name]
+    cmd_args = ["/home/USERNAME_GOES_HERE/.education/grader.py", LabInitial(labname).name]
     
     if question is not None:
         cmd_args.append(str(question))
@@ -48,7 +48,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
 def load_notebook(labname):
     with load_lock:
         result = subprocess.run([
-            '/home/umdclassuhad/resources/load.py', labname
+            '/home/USERNAME_GOES_HERE/resources/load.py', labname
         ], capture_output=True, text=True)
         result_queue.put(result)
 
@@ -59,7 +59,7 @@ def trigger_load(labname):
     return result_queue.get()
 
 def warn_student(labname):
-    warning_path = f"/home/umdclassuhad/saves/.{labname}_warning"
+    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
@@ -75,7 +75,7 @@ def sign_in_student(output0):
             stderr=subprocess.DEVNULL
         )
         subprocess.run(
-            ["mrg", "login", "umdclassuhad", "-p", open("/home/umdclassuhad/pass.txt").read().strip()],
+            ["mrg", "login", "USERNAME_GOES_HERE", "-p", open("/home/USERNAME_GOES_HERE/pass.txt").read().strip()],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -83,12 +83,12 @@ def sign_in_student(output0):
     return True
 
 def check_autosave(labname):
-    if os.path.exists(f"/home/umdclassuhad/saves/umdclassuhad_{labname}.tar.gz"):
-        subprocess.run(f"touch /home/umdclassuhad/saves/.{labname}_warning", shell=True)
+    if os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz"):
+        subprocess.run(f"touch /home/USERNAME_GOES_HERE/saves/.{labname}_warning", shell=True)
 
 def prepare_lab(labname, output0):
     with output0:
-        os.chdir("/home/umdclassuhad")
+        os.chdir("/home/USERNAME_GOES_HERE")
         output0.clear_output()
 
         # Sign in first
@@ -96,7 +96,7 @@ def prepare_lab(labname, output0):
         if not signedIn:
             return
 
-        materialPattern = f"real.{labname}jup.umdclassuhad"
+        materialPattern = f"real.{labname}jup.USERNAME_GOES_HERE"
         result = subprocess.run(['mrg', 'list', 'materializations'], capture_output=True, text=True)
         checkMaterial = result.stdout
         regex = re.compile(materialPattern)
@@ -107,8 +107,8 @@ def prepare_lab(labname, output0):
                 "<span style='color: orange;'>An existing activation for this lab already exists. </span>"
                 "<span>You might have run another lab without stopping this one. Attaching the existing activation...</span>"
             ))
-            subprocess.run('mrg xdc detach xdc.umdclassuhad', shell=True)
-            subprocess.run(f'mrg xdc attach xdc.umdclassuhad real.{labname}jup.umdclassuhad', shell=True)
+            subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True)
+            subprocess.run(f'mrg xdc attach xdc.USERNAME_GOES_HERE real.{labname}jup.USERNAME_GOES_HERE', shell=True)
             display(HTML(
                 "<span>Re-running the installation... </span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
@@ -156,12 +156,12 @@ def prepare_lab(labname, output0):
             """))
 
             if "XDC already attached" in startexp.stdout:
-                existingLab = re.search(r"real.(.*).umdclassuhad", startexp.stdout).group(1)
+                existingLab = re.search(r"real.(.*).USERNAME_GOES_HERE", startexp.stdout).group(1)
                 if labname == existingLab:
                     display(HTML("<span style='color: red;'>Your lab was already started. Please continue to the next step.</span>"))
                 else:
                     display(HTML(f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span><span>Please stop your experiments before starting a new one. Detaching the {existingLab} experiment.</span>"))
-                    subprocess.run('mrg xdc detach xdc.umdclassuhad', shell=True, check=True)
+                    subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
                     display(HTML("<span>Attaching the current lab.</span>"))
                     subprocess.run(f'mrg xdc attach xdc {materialPattern}', shell=True, check=True)
 
