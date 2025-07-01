@@ -24,7 +24,7 @@ def main():
         new_entry = f"{username}     {timestamp}     {sys.argv[1]}     {sys.argv[2]}     {sys.argv[3]}     {sys.argv[4]}\n"
 
     # Now, append to the logs, if they exist.
-    f = open("/home/.education/" + username + "_logs.txt", "a+")
+    f = open("/home/USERNAME_GOES_HERE/.education/" + username + "_logs.txt", "a+")
     f.write(new_entry)
     f.close()
 

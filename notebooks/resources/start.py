@@ -5,39 +5,64 @@ import threading
 import queue
 import time
 from IPython.display import display, HTML
+from enum import Enum
+import shlex
 
 save_lock = threading.Lock()
 load_lock = threading.Lock()
 result_queue = queue.Queue()
 
+class LabInitial(Enum):
+    I = "intro"
+    PO = "posix"
+    B = "buffer"
+    PA = "pathname"
+    S = "sqli"
+    X = "xss"
+    F = "firewalls"
+
 def save_notebook(labname):
     with save_lock:
         subprocess.run([
-            "su", "-", "umdclassuhad",
-            "-c", f'/project/umdclassuhad/notebooks/resources/save.py {labname}'
+            '/home/USERNAME_GOES_HERE/resources/save.py', labname
         ], capture_output=True, text=True)
+
+# def trigger_save(labname, question=None, response=None, answer=""):
+#     save_thread = threading.Thread(target=save_notebook, args=(labname,))
+#     save_thread.start()
+
+#     cmd_args = [
+#         f'/home/USERNAME_GOES_HERE/resources/save.py {labname}'
+#     ]
+
+#     if answer != "":
+#         clean_answer = answer.strip()
+#         quoted_answer = f'"{clean_answer}"'
+#         cmd_args.append(quoted_answer)
+
+#     result = subprocess.run(cmd_args, capture_output=True, text=True)
+#     print(result)
 
 def trigger_save(labname, question=None, response=None, answer=""):
     save_thread = threading.Thread(target=save_notebook, args=(labname,))
     save_thread.start()
-
-    cmd_args = [
-        "su", "-", "umdclassuhad",
-        "-c", f'/project/umdclassuhad/notebooks/resources/save.py {labname}'
-    ]
-
+    
+    # Build a list of arguments for grader.py.
+    cmd_args = ["/home/USERNAME_GOES_HERE/.education/grader.py", LabInitial(labname).name, question, response]
     if answer != "":
-        clean_answer = answer.strip()
-        quoted_answer = f'"{clean_answer}"'
-        cmd_args.append(quoted_answer)
-
-    subprocess.run(cmd_args, capture_output=True, text=True)
+        cmd_args.append(answer)
+    
+    # Quote each argument separately (casting to string) and join them with a space.
+    inner_cmd = " ".join(shlex.quote(str(arg)) for arg in cmd_args)
+    
+    # Now, pass this whole command to su using shlex.quote.
+    full_cmd = f"{shlex.quote(inner_cmd)}"
+    result = subprocess.run(full_cmd, capture_output=True, text=True)
 
 def load_notebook(labname):
     with load_lock:
         result = subprocess.run([
-            "su", "-", "umdclassuhad",
-            "-c", f'/project/umdclassuhad/notebooks/resources/load.py {labname}'
+            '/home/USERNAME_GOES_HERE/resources/load.py', labname
         ], capture_output=True, text=True)
         result_queue.put(result)
 
@@ -48,7 +73,7 @@ def trigger_load(labname):
     return result_queue.get()
 
 def warn_student(labname):
-    warning_path = f"/project/umdclassuhad/notebooks/saves/.{labname}_warning"
+    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
@@ -64,7 +89,7 @@ def sign_in_student(output0):
             stderr=subprocess.DEVNULL
         )
         subprocess.run(
-            ["mrg", "login", "umdclassuhad", "-p", open("/home/umdclassuhad/pass.txt").read().strip()],
+            ["mrg", "login", "USERNAME_GOES_HERE", "-p", open("/home/USERNAME_GOES_HERE/pass.txt").read().strip()],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -72,12 +97,12 @@ def sign_in_student(output0):
     return True
 
 def check_autosave(labname):
-    if os.path.exists(f"/home/umdclassuhad/saves/umdclassuhad_{labname}.tar.gz"):
-        subprocess.run(f"touch /home/umdclassuhad/saves/.{labname}_warning", shell=True)
+    if os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz"):
+        subprocess.run(f"touch /home/USERNAME_GOES_HERE/saves/.{labname}_warning", shell=True)
 
 def prepare_lab(labname, output0):
     with output0:
-        os.chdir("/home/umdclassuhad")
+        os.chdir("/home/USERNAME_GOES_HERE")
         output0.clear_output()
 
         # Sign in first
@@ -85,7 +110,7 @@ def prepare_lab(labname, output0):
         if not signedIn:
             return
 
-        materialPattern = f"real.{labname}jup.umdclassuhad"
+        materialPattern = f"real.{labname}jup.USERNAME_GOES_HERE"
         result = subprocess.run(['mrg', 'list', 'materializations'], capture_output=True, text=True)
         checkMaterial = result.stdout
         regex = re.compile(materialPattern)
@@ -96,8 +121,8 @@ def prepare_lab(labname, output0):
                 "<span style='color: orange;'>An existing activation for this lab already exists. </span>"
                 "<span>You might have run another lab without stopping this one. Attaching the existing activation...</span>"
             ))
-            subprocess.run('mrg xdc detach xdc.umdclassuhad', shell=True)
-            subprocess.run(f'mrg xdc attach xdc.umdclassuhad real.{labname}jup.umdclassuhad', shell=True)
+            subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True)
+            subprocess.run(f'mrg xdc attach xdc.USERNAME_GOES_HERE real.{labname}jup.USERNAME_GOES_HERE', shell=True)
             display(HTML(
                 "<span>Re-running the installation... </span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
@@ -145,12 +170,12 @@ def prepare_lab(labname, output0):
             """))
 
             if "XDC already attached" in startexp.stdout:
-                existingLab = re.search(r"real.(.*).umdclassuhad", startexp.stdout).group(1)
+                existingLab = re.search(r"real.(.*).USERNAME_GOES_HERE", startexp.stdout).group(1)
                 if labname == existingLab:
                     display(HTML("<span style='color: red;'>Your lab was already started. Please continue to the next step.</span>"))
                 else:
                     display(HTML(f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span><span>Please stop your experiments before starting a new one. Detaching the {existingLab} experiment.</span>"))
-                    subprocess.run('mrg xdc detach xdc.umdclassuhad', shell=True, check=True)
+                    subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
                     display(HTML("<span>Attaching the current lab.</span>"))
                     subprocess.run(f'mrg xdc attach xdc {materialPattern}', shell=True, check=True)
 

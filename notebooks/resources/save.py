@@ -22,7 +22,7 @@ def main():
     print("Backup tarball created.")
 
     # Define temporary and final filenames.
-    dest_dir = "/project/USERNAME_GOES_HERE/notebooks/saves"
+    dest_dir = "/home/USERNAME_GOES_HERE/saves"
     final_filename = os.path.join(dest_dir, "USERNAME_GOES_HERE_" + labname + ".tar.gz")
     temp_filename  = final_filename + ".new"
 
