@@ -61,7 +61,14 @@ fi
 ## saves/ so that students don't lose progress.
 ## pass.txt so that students don't lose their configuration.
 ## .local/ so that the kernel doesn't break when running the command.
-sudo rsync -a --delete --exclude='saves/' --exclude='pass.txt' --exclude='.local/' notebooks/ ~ >/dev/null
+## All hidden files (.*) so that we don't break SSH and Jupyter configs.
+sudo rsync -a --delete \
+  --exclude='saves/' \
+  --exclude='pass.txt' \
+  --exclude='.local/' \
+  --exclude='.*' \
+  --exclude='.*/' \
+  notebooks/ ~ >/dev/null
 
 # Ensure 'saves/' exists.
 mkdir -p $LABS/saves
@@ -102,17 +109,11 @@ for notebook in *.ipynb; do
 done
 
 # Change the USERNAME_GOES_HERE occurrence in the port forwarding script.
-sed -i "s/USERNAME_GOES_HERE/$USER/g" "$LABS/resources/port-forward/port-forward-setup"
-
-# Doing the same for the save/load scripts.
-sed -i "s/USERNAME_GOES_HERE/$USER/g" "$LABS/resources/save.py"
-sed -i "s/USERNAME_GOES_HERE/$USER/g" "$LABS/resources/load.py"
+find /home/$USER/resources/ -name "*.py" -exec sed -i "s|USERNAME_GOES_HERE|$USER|g" {} \+
 popd > /dev/null 2>&1
-
-# For section_4.py in the resources/firewall/ directory.
-sed -i "s/USERNAME_GOES_HERE/$USER/g" "$LABS/resources/firewall/section_4.py"
 
 # And finally, for the install scripts.
 find /home/$USER/.education -type f -name install -exec sed -i "s/USERNAME_GOES_HERE/$(whoami)/g" {} +
 
 echo -e "\033[0;32mDone. You can find your notebooks in $LABS. Please refresh your browser's tab before starting a lab.\033[0m"
+
