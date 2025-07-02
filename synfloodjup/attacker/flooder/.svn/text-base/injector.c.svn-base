@@ -1,0 +1,251 @@
+/*
+ * Copyright (C) 2007 SPARTA, Inc.
+ * This software is licensed under the GPLv3 license, included in
+ * ./GPLv3-LICENSE.txt in the source distribution
+ */
+
+#include <libnet.h>
+#include <pcap.h>
+#include <math.h>
+#include <getopt.h>
+
+int G_quit = 0;
+double G_mult = 1.0;
+char *G_file;
+char *G_filt;
+
+#ifdef WIN32
+#define usleep(usec) (Sleep((usec)/1000),0)
+#define ENOBUFS WSAENOBUFS
+#endif
+
+void usage()
+{
+	printf("\n");
+	printf("usage: injector -f <file> -x <pcap filter> -m <multiplier>\n");
+	printf("\n");
+	exit(0);
+}
+
+void catcher(int signo)
+{
+	G_quit = 1;
+}
+
+inline struct timeval now()
+{
+	struct timeval now;
+    gettimeofday(&now, NULL);
+	return now;
+}
+
+inline void tv_print(char *name, struct timeval x)
+{
+	double value = ((double)x.tv_sec + ((double)x.tv_usec/1000000.0));
+	printf("%s: %lf\n", name, value); 
+}
+
+inline struct timeval tv_sub(struct timeval a, struct timeval b)
+{
+	struct timeval tmp;
+	tmp.tv_sec = a.tv_sec - b.tv_sec;
+	tmp.tv_usec = a.tv_usec - b.tv_usec;
+	if (tmp.tv_usec < 0) { tmp.tv_usec += 1000000; tmp.tv_sec--; }
+	return tmp;
+}
+
+inline struct timeval tv_div(struct timeval x, double mult)
+{
+	struct timeval tmp;
+	double seconds, remainder, whole;
+	
+	seconds = (double)x.tv_sec / mult;
+
+	remainder = modf(seconds, &whole);
+	tmp.tv_sec = (long)whole;
+	tmp.tv_usec = (int)(((double)x.tv_usec / mult) + (remainder*1000000.0));
+	if (tmp.tv_usec >= 1000000) { tmp.tv_usec -= 1000000; tmp.tv_sec++; } 
+	return tmp;
+}
+
+inline int tv_sub_ms(struct timeval a, struct timeval b)
+{
+	int sec = a.tv_sec - b.tv_sec;
+	int usec = a.tv_usec - b.tv_usec;
+	int msec = (sec * 1000) + (usec / 1000);
+
+	if (msec < 0) return 0;
+	return msec;
+}
+
+
+int send_packets(pcap_t *pcap, libnet_t *lnet, double multiplier, int *packets, int *bytes, int *failed)
+{
+	struct libnet_ethernet_hdr *eth_hdr = NULL;
+    struct libnet_ipv4_hdr *iphdr = NULL;
+    struct pcap_pkthdr pkthdr;    /* libpcap packet info */
+    const u_char *pktdata = NULL; /* full packet buffer */
+	static libnet_ptag_t ipid = 0; /* must be static or libnet starts leaking memory like the Valdez */
+
+    struct timeval start_real, start_file, offset_real, offset_file;
+	int sleep_time;
+	int index;
+
+	index = 0;
+    while ((pktdata = pcap_next(pcap, &pkthdr)) != NULL)
+	{
+        /* die? */
+		if (G_quit) return 0;
+
+		index++;
+		
+		/** Determine pause time and do so. */
+		if (index == 1)
+		{
+			start_real = now();
+			start_file = pkthdr.ts;
+		}
+		else
+		{
+			/* Could reduce some computation but errors would accumulate. */
+			offset_real = tv_sub(now(), start_real);
+			offset_file = tv_sub(pkthdr.ts, start_file);
+
+			/*
+			 * Basic timing multiplier:
+			 *     sleep = (offset_file - (offset_real * mult)) / mult;
+			 * Less obvious but simplified:  
+			 *     sleep = (offset_file / mult) - offset_real;
+			 */
+			sleep_time = tv_sub_ms(tv_div(offset_file, multiplier), offset_real);
+			usleep(sleep_time * 1000);
+		}
+
+		/* Ignore non IP packets. */
+        eth_hdr = (struct libnet_ethernet_hdr *) pktdata;
+        if (ntohs(eth_hdr->ether_type) != ETHERTYPE_IP) continue;
+
+		/* Build/Modify the desired ip header. */
+		iphdr = (struct libnet_ipv4_hdr *) (&pktdata[14]);
+		ipid = libnet_build_ipv4(
+					ntohs(iphdr->ip_len),
+					iphdr->ip_tos,
+					ntohs(iphdr->ip_id),
+					ntohs(iphdr->ip_off),
+					iphdr->ip_ttl,
+					iphdr->ip_p,
+					0, //ntohs(iphdr->ip_sum),
+					iphdr->ip_src.s_addr,
+					iphdr->ip_dst.s_addr,
+					(u_char*)&(pktdata[34]),
+					(pkthdr.len - 34),
+					lnet,
+					ipid);
+
+		/* See if we actually built something. */
+		if (ipid == -1)
+		{
+			fprintf(stderr, "Can't build headers: %s\n", libnet_geterror(lnet));
+			return -1;
+		}
+		
+		/* Write it to the wire.  */
+		if (libnet_write(lnet) == -1)
+		{
+			fprintf(stderr, "Write error (len = %d): %s \n", pkthdr.len, libnet_geterror(lnet));
+            if (errno == ENOBUFS)
+				(*failed)++;
+			else
+				return -1;
+		}
+
+        *bytes += ntohs(iphdr->ip_len);
+        (*packets)++;
+    }
+
+	return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+	pcap_t *pcap = NULL;
+	libnet_t *lnet = NULL;
+	struct timeval start, dur;
+	char ebuf[256], errbuf[PCAP_ERRBUF_SIZE];
+    double time, bytes_sec, packets_sec, mb_sec;
+    int packets, bytes, failed, ii, c;
+
+	while ((c = getopt(argc, argv, "f:x:m:")) != -1)
+	{
+		switch (c)
+		{
+			case 'f': G_file = strdup(optarg); break; 
+			case 'x': G_filt = strdup(optarg); break;
+			case 'm': G_mult = atof(optarg); break;
+			default:
+				usage();
+		}
+	}
+
+	if (G_file == NULL)
+	{
+		usage();
+	}
+
+	/* Initialize the library.  Root priviledges are required.  */
+	if ((lnet = libnet_init(LIBNET_RAW4, NULL, ebuf)) == NULL)
+	{
+		printf("libnet_init() failed: %s\n", ebuf);
+		return -1;
+	}
+
+    /* register signals and start loop */
+    signal(SIGINT, catcher);
+    signal(SIGTERM, catcher);
+#ifndef WIN32
+    signal(SIGHUP, catcher);
+#endif
+	packets = bytes = failed = 0;
+	start = now();
+	ii = 0;
+
+	while (!G_quit)
+	{
+		if ((pcap = pcap_open_offline(G_file, errbuf)) != NULL)
+		{
+			struct bpf_program fcode;
+			ii++;
+			if (G_filt != NULL)
+			{
+				if (pcap_compile(pcap, &fcode, G_filt, 1, 0) == 0) /* TBD: netmask value? */
+					pcap_setfilter(pcap, &fcode);
+				else
+					printf("Invalid filter \"%s\"\n", G_filt);
+			}
+			send_packets(pcap, lnet, G_mult, &packets, &bytes, &failed);
+			pcap_close(pcap);
+		}
+		else
+		{
+			printf("Error opening file %s: %s\n", G_file, strerror(errno));
+			usage();
+		}
+	}
+
+
+	dur = tv_sub(now(), start);
+	time = (double)dur.tv_sec + ((double)dur.tv_usec / 1000000.0);
+    bytes_sec = (double)bytes / time;
+	packets_sec = (double)packets / time;
+    mb_sec = (bytes_sec * 8.0) / 1048576.0;
+
+    printf(" file started %d times\n", ii);
+    printf(" %u packets (%u bytes) sent in %.4f seconds\n", packets, bytes, time);
+    printf(" %.2f bytes/sec %.2f megabits/sec %.2f packets/sec\n", bytes_sec, mb_sec, packets_sec);
+	printf(" %u write attempts failed from full buffers\n", failed);
+
+	return 0;
+}   
+
+

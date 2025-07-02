@@ -1,0 +1,6 @@
+#!/bin/bash
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install flex libnet1-dev libpcap-dev -y
+sudo cp -r /share/education/TCPSYNFlood_USC_ISI/flooder /usr/local/src
+cd /usr/local/src/flooder; sudo make; sudo cp flooder /bin
+

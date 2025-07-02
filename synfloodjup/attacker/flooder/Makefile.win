@@ -1,0 +1,17 @@
+
+LIBNETDIR=libnet-1.1.2.1
+WPCAPFLAGS = -IWpdPack/Include -LWpdPack/Lib -lwpcap -lPacket -lws2_32
+WLIBNETFLAGS = -I${LIBNETDIR}/include/win32 -L${LIBNETDIR}/src -lnet -lIphlpapi
+
+ip2pcapif: ip2pcapif.c
+	gcc -mno-cygwin ${CFLAGS} $^ ${WPCAPFLAGS} -o $@
+
+winstat: winstat.c 
+	gcc -mno-cygwin ${CFLAGS} $^ ${WPCAPFLAGS} -o $@
+
+injector: injector.c 
+	gcc -mno-cygwin $^ ${WLIBNETFLAGS} ${WPCAPFLAGS} -o $@ 
+
+flooder: flooder.c 
+	gcc -mno-cygwin $^ ${WLIBNETFLAGS} ${WPCAPFLAGS} -o $@ 
+

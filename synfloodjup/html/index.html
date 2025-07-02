@@ -1,0 +1,195 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="index,nofollow">
+
+<title>DDoS: TCP SYN flood</title>
+
+
+
+
+<link rel="stylesheet" type="text/css" charset="utf-8" media="all" 
+href="../../css//common.css">
+<link rel="stylesheet" type="text/css" charset="utf-8" media="screen" 
+href="../../css//screen.css">
+
+</head><body dir="ltr" lang="en">
+
+<div id="page" dir="ltr" lang="en">
+<h1>TCP SYN flood</h1>
+<div class="author">Created by: Jelena Mirkovic, USC/ISI, sunshine@isi.edu.<br>
+</div>
+
+<div class="table-of-contents">
+<div class="table-of-contents-heading">Contents</div>
+<ol type="1">
+<li><a href="#overview">Overview</a>
+</li><li><a href="#reading">Required Reading</a>
+
+</li><li><a href="#intro">Introduction</a>
+
+
+</li><li><a href="#assignment">Assignment Instructions</a>
+<ol>
+<li><a href="#setup">Setup</a>
+</li><li><a href="#tasks">Tasks</a>
+<ol>
+<li><a href="#leg">Generating legitimate traffic</a>
+<li><a href="#cookies">Turning off SYN cookies</a>
+<li><a href="#attack">Generating attack traffic</a>
+<li><a href="#stat">Collecting statistics</a>
+</ol>
+
+</li><li><a href="#glitches">What Can Go Wrong</a>
+</li></ol>
+</li><li><a href="#extra">Extra Credit</a>
+
+</li><li><a href="#submission">Submission Instructions</a>
+
+</li></ol>
+</div>
+
+<span class="anchor" id="overview"></span> 
+<h2>Overview</h2>
+
+This exercise demonstrates a well-known denial-of-service attack, called <B>TCP SYN flood</B>. Students will be able to create a real attack using SPHERE tools, and to observe its effect on legitimate traffic. Afterwards, they will be asked to apply a known defense against SYN flood known as <b>SYN cookies</b>, repeat the attack and observe the protection.
+
+<p>This exercise helps students learn the following concepts: (1) How TCP/IP works and how its design can be misused for attacks, (2) How easy it is to perpetrate a DoS attack, with fully legitimate traffic and at a low rate, (3) How easy it is to protect machines from this type of attacks via built-in OS mechanisms. Additionally, extra credit questions improve a student's understanding of how networks and TCP/IP work.
+
+
+<span class="anchor" id="reading"></span> 
+<h2>Required Reading</h2>
+
+<p>All students should have completed an introductory networking course with grade B or better. 
+
+<ul>
+<li><A HREF="http://en.wikipedia.org/wiki/SYN_flood" target="new">Short summary of SYN flood attack on Wikipedia</A>
+<li>SYN flood attacks in the <A HREF="http://www.amazon.com/Internet-Denial-Service-Mechanisms-Networking/dp/0131475738/ref=sr_1_1?ie=UTF8&s=books&qid=1212642071&sr=8-1" target="new">Internet Denial of Service</A> book (optional reading)
+<li><A HREF="http://cr.yp.to/syncookies.html" target="new">SYN cookie overview</A>
+<li><A HREF="http://www.tcpdump.org/tcpdump_man.html" target="new">Tcpdump's man page</A>
+</ul>
+
+
+<span class="anchor" id="intro"></span> 
+<h2>Introduction</h2>
+
+Denial of service attacks deny service to legitimate clients by tying up resources at the server with a flood of legiitmate-looking service requests or junk traffic. Before proceeding to the assignment instructions make sure that you understand how TCP SYN flood attack works, which resource it ties up and how, and how syncookies help mitigate this attack.
+
+<span class="anchor" id="assignment"></span> 
+<h2>Assignment Instructions</h2>
+
+
+<h3 class="anchor" id="setup">Setup</h3>
+<ol>
+	<ol type="1"><li><p />If you don't have an account, follow the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/">here</a>.
+</li><li>Create an instance of this exercise by following the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/#working-on-assignments">here</a>, using <font color=red>synflood</font> as Lab name.  Your topology will look like below:<p><img src="topo.png">.
+</li><li>After setting up the lab, access your nodes. <p /></ol></ol><p />
+
+
+</div>
+
+<span class="anchor" id="tasks"></span>
+<div class="level3">
+<h3>Tasks</h3>
+<div class="level3">
+<span class="anchor" id="leg"></span>
+<h4>Generating legitimate traffic</h4>
+</a>
+<p>Create a Web traffic stream between the <tt>client</tt> and the <tt>server</tt> nodes by writing a script at the client that each second gets index.html from the server. You can for example write this script using <tt>bash</tt> and <tt>curl</tt>.
+</div>
+<div class="level3">
+<span class="anchor" id="cookies"></span>
+<h4>Turning off SYN cookies</h4>
+SYN cookies are often on by default in Linux and FreeBSD. To check if they are on do the following on <tt>server</tt> node:
+<pre>
+  sudo sysctl net.ipv4.tcp_syncookies
+</pre>
+If you see 1 as the result, SYN cookies must be set to zero for the demo to work. Type the following on the <tt>server</tt> machine:
+<pre>
+  sudo sysctl -w net.ipv4.tcp_syncookies=0
+  sudo sysctl -w net.ipv4.tcp_max_syn_backlog=10000
+</pre>
+Verify that SYN cookies are now off by typing on the <tt>server</tt> machine:
+<pre>
+  sudo sysctl net.ipv4.tcp_syncookies
+</div>
+
+<div class="level3">
+<span class="anchor" id="attack"></span>
+<h4>Generating attack traffic</h4>
+<p>Create a SYN flood between the <tt>attacker</tt> and the <tt>server</tt> nodes, using the Flooder tool. You can type "flooder" on the <tt>attacker</tt> node's command line to get a man page for the tool. For example <tt>flooder --dst server --src 1.2.0.0 --srcmask 255.255.0.0 --highrate 100 --proto 6</tt> will send a flood of 100 SYN packets per second to the target called <i>server</i> spoofing addresses from 1.2.0.0/16 range. You should make sure to spoof within 1.1.2.0 range (use mask 255.255.255.0). Most flooder commands require a "sudo" in front.
+
+
+</div>
+<div class="level3">
+<span class="anchor" id="stat"></span>
+<h4>Collecting statistics</h4>
+You will now collect <tt>tcpdump</tt> statistics on <tt>client</tt> machine with and without syncookies, calculate connection duration and draw graphs of connection duration on y-axis and connection start time on x-axis. Perform the following steps:
+<ol>
+<li>Stop all traffic by stopping your legitimate client's script and flooder.
+<li>Start <tt>tcpdump</tt> on the <t>client</t>
+<pre>
+  ip route get 5.6.7.8
+</pre>
+You should see something like this as a result:
+<pre>
+        5.6.7.8 via 1.1.2.2 dev eth2  src 1.1.2.3
+           cache  mtu 1500 advmss 1460 metric 10 64
+</pre>
+Thus the interface name leading to 5.6.7.8 is <b>eth2</b>. To see the traffic flowing type:
+<pre>
+  sudo <tt>tcpdump</tt> -nn -i eth2 
+</pre>
+then generate some traffic, restart your legitimate client code. You will need to discover proper <tt>tcpdump</tt> options to see only IP traffic and to save recorded traffic into a file. Start <tt>tcpdump</tt> with these options.
+<li>
+Using a stopwatch perform the following scenario:
+<ol>
+<li type="a">Start legitimate traffic
+<li type="a">After 30 seconds start the attack
+<li type="a">After 120 seconds stop the attack
+<li type="a">After 30 seconds stop the legitimate traffic
+<li type="a">Stop the <tt>tcpdump</tt> on the <tt>client</tt> and save the file
+</ol>
+<li>Turn the SYN cookies on and repeat the above steps. 
+<li>Using the recorded traffic files and <tt>tcpdump</tt> to read them, process the output and calculate connection duration for each TCP connection seen in the files.
+
+Connection duration is the difference between the time of the first SYN and of the ACK following a FIN-ACK (or between the first SYN and the first RESET) on a connection.  Recall what uniquely identifies a TCP connection, i.e. how to detect packets that belong to the same connection? If a connection did not end with a FIN or a RST, assign to it the duration of 200 s. 
+</ol>
+</div>
+</div>
+<span class="anchor" id="glitches"></span>
+
+<div class="level3">
+<h3>What can go wrong</h3>
+
+<ul>
+<li><b>Attack is ineffective</b>. Check that you are sending SYN packets (use <tt>tcpdump</tt> to verify) and that they are going to port 80. Also check that they are using spoofed source address. Finally, check that the volume is large enough (e.g., 100 or more per second).
+</ul>
+
+</div>
+<span class="anchor" id="extra"></span> 
+<h2>Extra Credit</h2>
+There are two extra-credit questions:
+<ol>
+<li>Remove spoofing from the attack. Repeat the exercise without SYN cookies and observe and explain the effect. What happens? Can you explain why this happens? For hints run a <tt>tcpdump</tt> on the <tt>server</tt> node and look for traffic patterns. Can you modify the attack so that it is effective without spoofing and how would you do this?
+</ol>
+
+<span class="anchor" id="submission"></span> 
+<h2>Submission Instructions</h2>
+
+You should submit a Word document with the following items (label each section):
+<ol>
+<li>Explanation how the TCP SYN flood attack works.
+<li>Explanation how SYN cookies work to prevent denial-of-service effect from SYN flood attack
+<li>Your legitimate client script
+<li>Your attack command (for flooder)
+<li>The connecton duration graphs you drew in task 5 (one with SYN cookies, one without SYN cookies). Indicate on the graphs using vertical lines or arrows the start and the end of the attack.
+<li>Explanation what happens in each case. Is the attack effective? How can you tell this from the graphs? 
+<li>Answers to extra credit questions if any.
+</ol>
+
+</div>
+</body></html>

@@ -1,0 +1,257 @@
+#define HAVE_REMOTE
+#include "pcap.h"
+
+/* The following are for getting the MAC address */
+#include "packet32.h"
+#include "ntddndis.h"
+
+
+void getMacAddress(char *name, char *mac)
+{
+	LPADAPTER adapter = NULL;
+	PPACKET_OID_DATA  o;
+	
+	adapter = PacketOpenAdapter(name);
+	if (!adapter || (adapter->hFile == INVALID_HANDLE_VALUE))
+	{
+		fprintf(stderr, "Can't open (%s) to get mac\n", name);
+		return;
+	}
+
+	o = malloc(6 + sizeof(PACKET_OID_DATA));
+	if (o == NULL) 
+	{
+		PacketCloseAdapter(adapter);
+		return;
+	}
+
+	o->Oid = OID_802_3_CURRENT_ADDRESS;
+	o->Length = 6;
+	memset(o->Data, 6, 0);
+	
+	if (PacketRequest(adapter, FALSE, o))
+		sprintf(mac, "%.2X:%.2X:%.2X:%.2X:%.2X:%.2X", o->Data[0], o->Data[1], o->Data[2], o->Data[3], o->Data[4], o->Data[5]);
+
+	free(o);
+	PacketCloseAdapter(adapter);
+	return;
+}
+
+
+void getNPFDetailsForIP(u_long ip, char *name, unsigned char *mac)
+{
+	pcap_if_t *alldevs;
+	pcap_if_t *d;
+	char errbuf[PCAP_ERRBUF_SIZE];
+	struct sockaddr_in *ipptr;
+	
+	/* Retrieve the device list on the local machine */
+	if (pcap_findalldevs_ex(PCAP_SRC_IF_STRING, NULL, &alldevs, errbuf) == -1)
+	{
+		fprintf(stderr,"Error in pcap_findalldevs: %s\n", errbuf);
+		exit(1);
+	}
+	
+	/* Print the list */
+	for(d=alldevs; d; d=d->next)
+	{
+		if ((d->addresses == NULL) || (d->addresses->addr == NULL)) continue;
+		ipptr = (struct sockaddr_in *)d->addresses->addr;
+		if (ipptr->sin_addr.s_addr == ip)
+		{
+			strcpy(name, d->name);
+			getMacAddress(&(d->name[8]), mac);
+			break;
+		}
+	}
+
+	pcap_freealldevs(alldevs);
+	return;
+}
+
+
+pcap_t *openCounter(char *name, char *filter)
+{
+	char errbuf[PCAP_ERRBUF_SIZE];
+	pcap_t *fp;
+	u_int netmask = 0xFFFFFFFF;
+	struct bpf_program fcode;
+
+	/* Open the output adapter */
+	if ((fp = pcap_open(name, 100, PCAP_OPENFLAG_PROMISCUOUS, -1, NULL, errbuf) ) == NULL)
+	{
+		fprintf(stderr,"Unable to open adapter %s.\n", errbuf);
+		return NULL;
+	}
+
+	/*compile the filter */
+	if (pcap_compile(fp, &fcode, filter, 1, netmask) <0 )
+	{
+		fprintf(stderr,"Unable to compile the packet filter. Check the syntax.\n");
+		pcap_close(fp);
+		return NULL;
+	}
+	
+	/* set the filter */
+	if (pcap_setfilter(fp, &fcode)<0)
+	{
+		fprintf(stderr,"Error setting the filter.\n");
+		pcap_close(fp);
+		return NULL;
+	}
+
+	/* Put the interface in statstics mode */
+	if (pcap_setmode(fp, MODE_STAT)<0)
+	{
+		fprintf(stderr,"\nError setting the mode.\n");
+		pcap_close(fp);
+		return NULL;
+	}
+
+	return fp;
+}
+
+
+int openSocket()
+{
+	int sockl;
+	struct sockaddr_in local;
+	WSADATA wsaData;
+	int err;
+
+	err = WSAStartup(MAKEWORD(2,2), &wsaData);
+	if ((sockl = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	{
+		fprintf(stderr, "Unable to create socket");
+		return -1;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_addr.s_addr = 0; //htonl(0x7F000001);
+	local.sin_port = htons(2345);
+	if (bind(sockl, (struct sockaddr *)&local, sizeof(local)) < 0)
+	{
+		closesocket(sockl);
+		fprintf(stderr, "Unable to bind socket (%d, %d)", sockl, errno);
+		return -1;
+	}
+
+	if (listen(sockl, 10) < 0)
+	{
+		closesocket(sockl);
+		fprintf(stderr, "Unable to listen on socket");
+		return -1;
+	}
+
+	return sockl;
+}
+
+void usage()
+{
+	fprintf(stderr, "usage: winstat.exe handle:ip:type [handle:ip:type] ... ");
+	exit(-1);
+}
+
+
+typedef struct {
+	char *handle;
+	pcap_t *fp;
+	LARGE_INTEGER pkts;
+	LARGE_INTEGER bytes;
+} Counter;
+
+int main(int argc, char **argv)
+{
+	Counter *list;
+	int ii, listlen = 2, len;
+	int sockl, sock;
+	char npfname[128];
+	char filter[64];
+	unsigned char mac[20];
+	char buf[256];
+
+	struct pcap_pkthdr *header;
+	const u_char *pkt_data;
+	LARGE_INTEGER *counterData;
+
+	char *mark, *ip, *type;
+
+
+	list = (Counter*)malloc(sizeof(Counter) * (argc-1));
+	listlen = argc-1;
+
+	for (ii = 0; ii < argc-1; ii++)
+	{
+		mark = argv[ii+1];
+		ip = strchr(mark, ':');
+
+		if (ip == NULL) usage();
+		*ip = 0;
+		ip++;
+	
+		type = strchr(ip, ':');
+
+		if (type == NULL) usage();
+		*type = 0;
+		type++;
+
+		getNPFDetailsForIP(inet_addr(ip), npfname, mac);
+
+		if (strncmp(type, "inall", 5) == 0)
+			sprintf(filter, "ether dst %s", mac);
+		else if (strncmp(type, "outall", 6) == 0)
+			sprintf(filter, "ether src %s", mac);
+		else if (strncmp(type, "inatt", 5) == 0)
+			sprintf(filter, "ether dst %s and (ip[1]  & 0xE0 = 0xE0)", mac);
+		else if (strncmp(type, "outatt", 6) == 0)
+			sprintf(filter, "ether src %s and (ip[1]  & 0xE0 = 0xE0)", mac);
+		else
+			usage();
+
+		list[ii].handle = mark;
+		list[ii].pkts.QuadPart = 0;
+		list[ii].bytes.QuadPart = 0;
+		list[ii].fp = openCounter(npfname, filter);
+	}  
+
+
+	if ((sockl = openSocket()) < 0)
+		return -1;
+
+	while(1)
+	{
+		if ((sock = accept(sockl, NULL, NULL)) < 0)
+		{
+			fprintf(stderr, "accept failure\n");
+			break;
+		}
+
+		while (1)
+		{
+			if (recv(sock, buf, 1, 0) < 1)
+				break;
+	
+			for (ii = 0; ii < listlen; ii++)
+			{
+				pcap_next_ex(list[ii].fp, &header, &pkt_data);
+				counterData = (LARGE_INTEGER*)pkt_data;
+				list[ii].pkts.QuadPart += counterData[0].QuadPart;
+				list[ii].bytes.QuadPart += counterData[1].QuadPart;
+				len = sprintf(buf, "%s:%I64d:%I64d ", list[ii].handle, list[ii].pkts, list[ii].bytes);
+				send(sock, buf, len, 0);
+			}
+	
+			send(sock, "\n", 1, 0);
+		}
+
+		closesocket(sock);
+	}
+
+
+	for (ii = 0; ii < listlen; ii++)
+		pcap_close(list[ii].fp);
+
+	return 0;
+}
+
+

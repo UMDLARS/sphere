@@ -1,0 +1,24 @@
+
+LIBNETDIR=libnet-1.1.2.1
+PCAPDIR=libpcap-1.0.0
+
+all: celp flooder injector
+
+clean:
+	rm -f celp flooder injector
+
+${LIBNETDIR}/src/libnet.a:
+	cd ${LIBNETDIR}; ./configure; make
+
+${PCAPDIR}/libpcap.a:
+	cd ${PCAPDIR}; ./configure; make
+
+celp: celp.c 
+	gcc celp.c -o celp
+
+flooder: ${PCAPDIR}/libpcap.a ${LIBNETDIR}/src/libnet.a flooder.c 
+	gcc -I${LIBNETDIR}/include -L${LIBNETDIR}/src -I${PCAPDIR}/include -L${PCAPDIR}/ flooder.c -lnet -lm -lpcap -o flooder
+
+injector: ${PCAPDIR}/libpcap.a ${LIBNETDIR}/src/libnet.a injector.c 
+	gcc -I${LIBNETDIR}/include -L${LIBNETDIR}/src -I${PCAPDIR}/incldue -L${PCAPDIR}/ injector.c -lnet -lpcap -o injector
+
