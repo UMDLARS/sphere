@@ -43,7 +43,7 @@ def main():
 
                     # Otherwise, if the file doesn't exist yet, we will check the logs.
                     elif (not os.path.exists(path) and \
-                          "/home/umdclassiolq/jupyterintro/ ATTRIB jupytertest.txt" in log_contents):
+                          "/home/USERNAME_FOR_NODE/jupyterintro/ ATTRIB jupytertest.txt" in log_contents):
                         sys.exit(0)
 
                     # File exists, so we will check it directly.

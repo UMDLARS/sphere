@@ -43,5 +43,8 @@ sudo -u $USER /home/.checker/run_inotify.sh
 echo "You found me!" > /usr/share/discover/dtd/.findme.txt
 chown -R $USER /usr/share/discover/dtd/
 
+# Replacing a username placeholder for step2.py.
+sed -i "s/USERNAME_FOR_NODE/$USER/g" /home/.checker/step2.py
+
 # Clean up.
 rm -rf *
