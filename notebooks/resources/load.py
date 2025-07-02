@@ -6,7 +6,6 @@ import time
 
 def main():
     labname = sys.argv[1]
-    print(labname)
 
     # Check to see if the node is reachable.
     if (labname == "xss" or labname == "firewalls"):
@@ -22,10 +21,10 @@ def main():
     elif (process.returncode == 0):
         if (labname == "xss" or labname == "firewalls"):
             # Node is available. Proceed to transfer over the backup.
-            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /project/USERNAME_GOES_HERE/notebooks/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@server:/tmp", shell=True, stdout=subprocess.DEVNULL)
+            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /home/$USER/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@server:/tmp", shell=True, stdout=subprocess.DEVNULL)
         else:
             # Node is available. Proceed to transfer over the backup.
-            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /project/USERNAME_GOES_HERE/notebooks/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@" + labname + ":/tmp", shell=True, stdout=subprocess.DEVNULL)
+            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /home/$USER/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@" + labname + ":/tmp", shell=True, stdout=subprocess.DEVNULL)
 
         # Check to make sure that the tarball was transferred before calling the load script for the lab.
         # This is to prevent a race condition, much like the save.py file.
