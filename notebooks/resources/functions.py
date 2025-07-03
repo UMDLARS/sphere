@@ -100,7 +100,7 @@ def stop_lab(labname, confirm, output):
             
             display(HTML(f"<span>Stopping the {labname} lab. This will take a minute to process. Please wait.</span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-            stopexp = subprocess.run(f'bash /share/stopexp {labname}jup', capture_output=True, text=True, shell=True)
+            stopexp = subprocess.run(f'bash /home/stopexp {labname}jup', capture_output=True, text=True, shell=True)
             output.clear_output()
             if ("Error deleting the experiment" in stopexp.stdout):
                 output.clear_output()
@@ -110,6 +110,32 @@ def stop_lab(labname, confirm, output):
                 display(HTML("<span>Done. Result:</span>"))
                 print(stopexp.stdout)
                 display(HTML("<newline><span style='color: green;'><strong>Your lab has been ended.</strong></span>"))
+
+def load_lab(labname, output0_2):
+    with output0_2:
+        output0_2.clear_output()
+        display(HTML("<span>Searching for an existing lab in your notebook...</span>"))
+
+    if (os.path.exists("/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_intro.tar.gz")):
+        with output0_2:
+            output0_2.clear_output()
+            display(HTML("<span>Loading your lab...</span> \
+                <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
+            result = trigger_load()
+            if (result.returncode == 1):
+                output0_2.clear_output()
+                display(HTML("<span style='color: green;'>Your lab has been successfully loaded. Please click on the <img width='20px' height='20px' style='margin-left: 1px;' src='resources/fast_forward.png'> icon at the top of your notebook to reflect your changes.</span>"))
+            elif (result.returncode == 2):
+                output0_2.clear_output()
+                display(HTML("<span style='color: red;'>The intro lab is inaccessible. Please start your lab. If you have already started it, wait a minute and try again.</span>"))
+            else:
+                output0_2.clear_output()
+                display(HTML("<span style='color: red;'>An error occurred while loading your lab.</span>"))
+
+    else:
+        with output0_2:
+            output0_2.clear_output()
+            display(HTML("<span style='color: red;'>You do not have a saved tarball for this lab.</span>"))
 
 def prepare_lab(labname, output0):
     with output0:
@@ -141,7 +167,7 @@ def prepare_lab(labname, output0):
 
             check_autosave(labname)
 
-            subprocess.run(f'bash /share/runlab {labname}jup', capture_output=False, text=True, shell=True)
+            subprocess.run(f'bash /home/runlab {labname}jup', capture_output=False, text=True, shell=True)
             output0.clear_output()
             
             display(HTML(
@@ -156,7 +182,7 @@ def prepare_lab(labname, output0):
             ))
 
             try:
-                startexp = subprocess.run(f'bash /share/startexp {labname}jup', capture_output=True, text=True, shell=True)
+                startexp = subprocess.run(f'bash /home/startexp {labname}jup', capture_output=True, text=True, shell=True)
             except Exception:
                 output0.clear_output()
                 display(HTML("<span style='color: red;'>There was an error starting your experiment.</span>"))
@@ -192,7 +218,7 @@ def prepare_lab(labname, output0):
 
             display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span>"))
             time.sleep(2)
-            subprocess.run(f'bash /share/runlab {labname}jup', shell=True)
+            subprocess.run(f'bash /home/runlab {labname}jup', shell=True)
             check_autosave(labname)
 
             display(HTML(
@@ -206,7 +232,7 @@ def prepare_lab(labname, output0):
 
 """
 Use something like this if you are trying to debug something within this script.
-result = subprocess.run(f'bash /share/runlab {labname}jup', capture_output=True, text=True, shell=True)
+result = subprocess.run(f'bash /home/runlab {labname}jup', capture_output=True, text=True, shell=True)
 with output0:
     output0.append_stdout(f"Return code: {result.returncode}\n")
     output0.append_stdout(f"STDOUT:\n{result.stdout}\n")
