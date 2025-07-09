@@ -2,7 +2,7 @@
 import sys
 import shlex
 
-# Required options and their expected values
+# Required options and their expected values.
 REQUIRED_PARAMS = {
     "--dst": "server",
     "--highrate": "100",
@@ -16,20 +16,22 @@ def main():
         print("Usage: ./check_flooder.py 'Your Answer Here'")
         sys.exit(1)
 
-    # Parse the command string into arguments (like a shell)
+    # Parse the command string into arguments (like a shell).
     try:
         args = shlex.split(sys.argv[1])
     except ValueError as e:
         print(f"Error parsing command: {e}")
         sys.exit(1)
 
-    # Check prefix
+    # Check prefix.
     if len(args) < 2 or args[0] != "sudo" or args[1] != "flooder":
         sys.exit(2)
 
-    # Build a dictionary of options and values
+    # Build a dictionary of options and values.
     arg_dict = {}
-    i = 2  # start after "sudo flooder"
+
+    # Start after "sudo flooder".
+    i = 2
     while i < len(args) - 1:
         if args[i].startswith("--"):
             arg_dict[args[i]] = args[i + 1]
@@ -37,7 +39,7 @@ def main():
         else:
             i += 1
 
-    # Check required parameters
+    # Check required parameters.
     for key, value in REQUIRED_PARAMS.items():
         if arg_dict.get(key) != value:
             sys.exit(3)

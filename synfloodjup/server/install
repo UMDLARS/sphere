@@ -1,8 +1,10 @@
 #!/bin/bash
+export STUDENT=USERNAME_GOES_HERE
+
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y apache2
 sudo mkdir -p /home/.checker
-sudo chown -R $USER:$USER /home/.checker
+sudo chown -R $STUDENT:$STUDENT /home/.checker
 cp /tmp/server/checker/* /home/.checker
 cp /tmp/server/*synflood.sh /home/.checker
 mkdir -p /home/.checker/responses
