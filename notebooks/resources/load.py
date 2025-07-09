@@ -4,52 +4,57 @@ import sys
 import os
 import time
 
+SSH_KEY = "/home/USERNAME_GOES_HERE/.ssh/merge_key"
+USER = "USERNAME_GOES_HERE"
+REMOTE_SERVER = "server"
+SAVE_DIR = f"/home/{USER}/saves"
+
+SPECIAL_LABS = {"xss", "firewalls", "synflood"}
+
+def run_command(command: str):
+    return subprocess.run(command, shell=True, stdout=subprocess.DEVNULL)
+
+def is_node_reachable(host: str) -> bool:
+    result = run_command(f"ping -c 3 {host}")
+    return result.returncode == 0
+
+def transfer_tarball(labname: str, host: str) -> bool:
+    local_tarball = os.path.join(SAVE_DIR, f"{USER}_{labname}.tar.gz")
+    remote_path = f"{USER}@{host}:/tmp"
+    cmd = f"scp -i {SSH_KEY} {local_tarball} {remote_path}"
+    run_command(cmd)
+
+    # Wait until the file appears on the remote side
+    remote_file = f"/tmp/{USER}_{labname}.tar.gz"
+    while True:
+        test_cmd = f"ssh -i {SSH_KEY} {USER}@{host} 'test -f {remote_file}'"
+        if run_command(test_cmd).returncode == 0:
+            return True
+        time.sleep(1)
+
+def run_load_script(labname: str, host: str):
+    load_script = f"/home/.checker/load{labname}.sh"
+    cmd = f"ssh -i {SSH_KEY} {USER}@{host} '{load_script}'"
+    run_command(cmd)
+
 def main():
-    labname = sys.argv[1]
-
-    # Check to see if the node is reachable.
-    if (labname == "xss" or labname == "firewalls"):
-        process = subprocess.run('ping -c 3 server', shell=True, stdout=subprocess.DEVNULL)
-    else:
-        process = subprocess.run('ping -c 3 ' + labname, shell=True, stdout=subprocess.DEVNULL)
-
-    # Cannot be reached.
-    if (process.returncode == 2):
-        sys.exit(2)
-
-    # Successfully pinged. Moving data.
-    elif (process.returncode == 0):
-        if (labname == "xss" or labname == "firewalls"):
-            # Node is available. Proceed to transfer over the backup.
-            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /home/$USER/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@server:/tmp", shell=True, stdout=subprocess.DEVNULL)
-        else:
-            # Node is available. Proceed to transfer over the backup.
-            process = subprocess.run("scp -i /home/USERNAME_GOES_HERE/.ssh/merge_key /home/$USER/saves/USERNAME_GOES_HERE_" + labname + ".tar.gz USERNAME_GOES_HERE@" + labname + ":/tmp", shell=True, stdout=subprocess.DEVNULL)
-
-        # Check to make sure that the tarball was transferred before calling the load script for the lab.
-        # This is to prevent a race condition, much like the save.py file.
-        transfer_success = False
-
-        # Start to validate that the tarball was transferred.
-        while (transfer_success == False):
-            if (labname == "xss" or labname == "firewalls"):
-                process = subprocess.run("ssh -i /home/USERNAME_GOES_HERE/.ssh/merge_key server 'test -f /tmp/USERNAME_GOES_HERE_" + labname + ".tar.gz'", shell=True, stdout=subprocess.DEVNULL)
-            else:
-                process = subprocess.run("ssh -i /home/USERNAME_GOES_HERE/.ssh/merge_key " + labname + " 'test -f /tmp/USERNAME_GOES_HERE_" + labname + ".tar.gz'", shell=True, stdout=subprocess.DEVNULL)
-            if (process.returncode == 0):
-                transfer_success = True
-
-        # Transfer validated. Begin the load command for the respective lab.
-        if (labname == "xss" or labname == "firewalls"):
-            process = subprocess.run("ssh -i /home/USERNAME_GOES_HERE/.ssh/merge_key server '/home/.checker/load" + labname + ".sh'", shell=True, stdout=subprocess.DEVNULL)
-
-        else:
-            process = subprocess.run("ssh -i /home/USERNAME_GOES_HERE/.ssh/merge_key " + labname + " '/home/.checker/load" + labname + ".sh'", shell=True, stdout=subprocess.DEVNULL)
-            
+    if len(sys.argv) != 2:
+        print("Usage: ./load.py <labname>")
         sys.exit(1)
 
-    # For other return codes.
-    else:
-        sys.exit(0)
+    labname = sys.argv[1]
+
+    scp_host = REMOTE_SERVER if labname in SPECIAL_LABS else labname
+
+    if not is_node_reachable(scp_host):
+        sys.exit(2)
+
+    print("Node is reachable. Transferring backup...")
+    if transfer_tarball(labname, scp_host):
+        print("Transfer confirmed. Executing load script...")
+        run_load_script(labname, scp_host)
+        print("Load script executed.")
+
+    sys.exit(1)
 
 main()

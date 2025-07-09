@@ -123,7 +123,7 @@ def load_lab(labname, output0_2):
             output0_2.clear_output()
             display(HTML("<span>Loading your lab...</span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-            result = trigger_load()
+            result = trigger_load(labname)
             if (result.returncode == 1):
                 output0_2.clear_output()
                 display(HTML("<span style='color: green;'>Your lab has been successfully loaded. Please click on the <img width='20px' height='20px' style='margin-left: 1px;' src='resources/fast_forward.png'> icon at the top of your notebook to reflect your changes.</span>"))

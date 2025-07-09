@@ -28,8 +28,8 @@ if [ -e "${TMP}/step_2_response.txt" ]; then
 fi
 
 # If step_3_response.txt exists, send it to attacker:~/../.checker/responses/.
-if [ -e "${TMP}/step_3_response.txt" ]; then
-    scp step_3_response.txt attacker:~/../.checker/responses/step_3_response.txt
+if [ -e "${TMP}/step_3_answer.txt" ]; then
+    scp step_3_answer.txt attacker:~/../.checker/responses/step_3_answer.txt
 fi
 
 # Return to the previous directory.

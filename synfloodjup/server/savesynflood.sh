@@ -21,10 +21,10 @@ if [ -e "/home/.checker/responses/step_2_response.txt" ]; then
 fi
 
 # Check if step_3_response.txt exists in the attacker node and copy it if it does.
-scp attacker:~/../.checker/responses/step_3_response.txt .
-if [ -e "/home/.checker/step_3_response.txt" ]; then
-    cp "/home/.checker/step_3_response.txt" $TMP
-    rm -f "/home/.checker/step_3_response.txt"
+scp attacker:~/../.checker/responses/step_3_answer.txt .
+if [ -e "/home/.checker/step_3_answer.txt" ]; then
+    cp "/home/.checker/step_3_answer.txt" $TMP
+    rm -f "/home/.checker/step_3_answer.txt"
 fi
 
 # Create the tarball, then move it to the home directory temporarily to scp it over.
