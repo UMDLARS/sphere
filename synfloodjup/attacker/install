@@ -5,7 +5,8 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install make build-essential flex libnet1-dev libpcap-dev -y
 sudo cp -r flooder /usr/local/src
 cd /usr/local/src/flooder; sudo make; sudo cp flooder /bin
-sudo chown -R $STUDENT:$STUDENT /home/.checker
+sudo mkdir -p /home/.checker
 cp /tmp/attacker/checker/* /home/.checker
 cp /tmp/attacker/*synflood.sh /home/.checker
 mkdir -p /home/.checker/responses
+sudo chown -R $STUDENT:$STUDENT /home/.checker
