@@ -20,6 +20,8 @@ class LabInitial(Enum):
     S = "sqli"
     X = "xss"
     F = "firewalls"
+    SY = "synflood"
+    M = "mitm"
 
 def save_notebook(labname):
     with save_lock:
