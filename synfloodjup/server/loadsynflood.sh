@@ -18,7 +18,12 @@ tar -xvf ${TMP}/${USER}_synflood.tar.gz
 
 # If stream.sh exists, send it back to client:~/stream.sh.
 if [ -e "${TMP}/stream.sh" ]; then
-    scp stream.sh client:~/stream.sh
+    scp -o StrictHostKeyChecking=no stream.sh client:~/stream.sh
+fi
+
+# Do the same with the tcpdump files.
+if [[ -f "$TMP/tcpdump_cookies_off.txt" && -f "$TMP/tcpdump_cookies_on.txt" ]]; then
+    scp -o StrictHostKeyChecking=no "$TMP/tcpdump_cookies_off.txt" "$TMP/tcpdump_cookies_on.txt" client:~/
 fi
 
 # If step_2_response.txt exists, place it in /home/.checker/responses/.
