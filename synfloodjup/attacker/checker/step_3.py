@@ -44,6 +44,10 @@ def main():
         if arg_dict.get(key) != value:
             sys.exit(3)
 
+    # Step passes. Save their response.
+    f = open("/home/.checker/responses/step_3_answer.txt", "w+")
+    f.write(sys.argv[1])
+    f.close()
     sys.exit(0)
 
 main()
