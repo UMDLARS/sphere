@@ -1,7 +1,10 @@
 #!/bin/bash
+export STUDENT=USERNAME_GOES_HERE
+
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y net-tools
 sudo mkdir -p /home/.checker
-sudo chown -R $USER:$USER /home/.checker
+sudo chown -R $STUDENT:$STUDENT /home/.checker
 cp /tmp/client/checker/* /home/.checker
 mkdir -p /home/.checker/responses
+sed -i "s|USERNAME_FOR_NODE|$STUDENT|g" /home/.checker/step_1.py

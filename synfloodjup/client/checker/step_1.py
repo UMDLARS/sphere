@@ -16,7 +16,7 @@ def main():
         print("Usage: ./step_2.py")
         sys.exit(1)
 
-    pathname = "/home/USERNAME_GOES_HERE/stream.sh"
+    pathname = "/home/USERNAME_FOR_NODE/stream.sh"
 
     # Check to see if the file exists yet.
     if (not os.path.exists(pathname)):
