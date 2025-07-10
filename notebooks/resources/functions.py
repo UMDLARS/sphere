@@ -118,7 +118,7 @@ def load_lab(labname, output0_2):
         output0_2.clear_output()
         display(HTML("<span>Searching for an existing lab in your notebook...</span>"))
 
-    if (os.path.exists("/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_intro.tar.gz")):
+    if (os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz")):
         with output0_2:
             output0_2.clear_output()
             display(HTML("<span>Loading your lab...</span> \
@@ -129,7 +129,7 @@ def load_lab(labname, output0_2):
                 display(HTML("<span style='color: green;'>Your lab has been successfully loaded. Please click on the <img width='20px' height='20px' style='margin-left: 1px;' src='resources/fast_forward.png'> icon at the top of your notebook to reflect your changes.</span>"))
             elif (result.returncode == 2):
                 output0_2.clear_output()
-                display(HTML("<span style='color: red;'>The intro lab is inaccessible. Please start your lab. If you have already started it, wait a minute and try again.</span>"))
+                display(HTML(f"<span style='color: red;'>The {labname} lab is inaccessible. Please start your lab. If you have already started it, wait a minute and try again.</span>"))
             else:
                 output0_2.clear_output()
                 display(HTML("<span style='color: red;'>An error occurred while loading your lab.</span>"))
@@ -144,87 +144,106 @@ def prepare_lab(labname, output0):
         os.chdir("/home/USERNAME_GOES_HERE")
         output0.clear_output()
 
-        # Sign in first.
-        signedIn = sign_in_student(output0)
-        if not signedIn:
+        # Sign in first
+        if not sign_in_student(output0):
             return
 
-        materialPattern = f"real.{labname}jup.USERNAME_GOES_HERE"
-        result = subprocess.run(['mrg', 'list', 'materializations'], capture_output=True, text=True)
-        checkMaterial = result.stdout
-        regex = re.compile(materialPattern)
-        match = regex.search(checkMaterial)
+        material_pattern = f"real.{labname}jup.USERNAME_GOES_HERE"
+        result = subprocess.run(
+            ['mrg', 'list', 'materializations'],
+            capture_output=True, text=True
+        )
 
-        if match:
+        if re.search(material_pattern, result.stdout):
             display(HTML(
-                "<span style='color: orange;'>An existing activation for this lab already exists. </span>"
-                "<span>You might have run another lab without stopping this one. Attaching the existing activation...</span>"
+                "<span style='color: orange;'>An existing activation for this lab already exists.</span> "
+                "<span>You might have run another lab without stopping it. Attaching the existing activation...</span>"
             ))
-            subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True)
-            subprocess.run(f'mrg xdc attach xdc.USERNAME_GOES_HERE real.{labname}jup.USERNAME_GOES_HERE', shell=True)
+
+            subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
+            subprocess.run(
+                f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
+                shell=True, check=True
+            )
+
             display(HTML(
-                "<span>Re-running the installation... </span> \
-                <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
+                "<span>Re-running the installation... </span>"
+                "<span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
             ))
 
             check_autosave(labname)
 
-            subprocess.run(f'bash /home/runlab {labname}jup', capture_output=False, text=True, shell=True)
+            subprocess.run(
+                ['bash', '/home/runlab', f'{labname}jup'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True
+            )
+
             output0.clear_output()
-            
             display(HTML(
-                "<newline><span style='color: green;'><strong>Your lab has been re-installed. </strong></span>"
+                "<br><span style='color: green;'><strong>Your lab has been re-installed. </strong></span>"
                 "<span>When you're finished, close your lab at the bottom of the notebook.</span>"
             ))
+
         else:
             display(HTML("<span>No existing activations are found.</span>"))
             display(HTML(
-                f"<span>Starting the {labname} lab. This will take a few minutes to process. Please wait.</span> \
-                <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
+                f"<span>Starting the {labname} lab. This will take a few minutes to process. Please wait.</span> "
+                "<span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
             ))
 
             try:
-                startexp = subprocess.run(f'bash /home/startexp {labname}jup', capture_output=True, text=True, shell=True)
-            except Exception:
+                startexp = subprocess.run(
+                    ['bash', '/home/startexp', f'{labname}jup'],
+                    capture_output=True, text=True, check=True
+                )
+            except subprocess.CalledProcessError as e:
                 output0.clear_output()
                 display(HTML("<span style='color: red;'>There was an error starting your experiment.</span>"))
                 return
 
             output0.clear_output()
-            if startexp.returncode == 1:
-                display(HTML(f"""
-                <span style='color: red;'>There was an error starting your experiment. The log has been shown below. Please view it and fix any mistakes (like an invalid password in ~/pass.txt, or SPHERE may be down).
-                If you are stuck and need help, please consult your professor/TA.</span>
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
-                <pre style="white-space: pre-wrap;">{startexp.stdout}</pre>
-                </div>
-                """))
-                return
+            output_html = startexp.stdout.strip()
 
-            display(HTML(f"""
-            <span>Done. Result:</span>
-            <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
-            <pre style="white-space: pre-wrap;">{startexp.stdout}</pre>
-            </div>
-            """))
+            display(HTML(
+                f"<span>Done. Result:</span>"
+                f"<div style='max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;'>"
+                f"<pre style='white-space: pre-wrap;'>{output_html}</pre></div>"
+            ))
 
             if "XDC already attached" in startexp.stdout:
-                existingLab = re.search(r"real.(.*).USERNAME_GOES_HERE", startexp.stdout).group(1)
-                if labname == existingLab:
+                match = re.search(r"real\.(.*?)\.USERNAME_GOES_HERE", startexp.stdout)
+                existing_lab = match.group(1) if match else None
+
+                if existing_lab == labname:
                     display(HTML("<span style='color: red;'>Your lab was already started. Please continue to the next step.</span>"))
-                else:
-                    display(HTML(f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span><span>Please stop your experiments before starting a new one. Detaching the {existingLab} experiment.</span>"))
+                elif existing_lab:
+                    display(HTML(
+                        f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span>"
+                        f"<span>Please stop your experiments before starting a new one. Detaching the <code>{existing_lab}</code> experiment.</span>"
+                    ))
                     subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
                     display(HTML("<span>Attaching the current lab.</span>"))
-                    subprocess.run(f'mrg xdc attach xdc {materialPattern}', shell=True, check=True)
+                    subprocess.run(
+                        f'mrg xdc attach xdc {material_pattern}',
+                        shell=True, check=True
+                    )
 
             display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span>"))
             time.sleep(2)
-            subprocess.run(f'bash /home/runlab {labname}jup', shell=True)
+
+            subprocess.run(
+                ['bash', '/home/runlab', f'{labname}jup'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True
+            )
+
             check_autosave(labname)
 
             display(HTML(
-                "<newline><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
+                "<br><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
                 "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
             ))
 
