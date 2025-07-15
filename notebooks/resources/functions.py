@@ -144,7 +144,14 @@ def prepare_lab(labname, output0):
         os.chdir("/home/USERNAME_GOES_HERE")
         output0.clear_output()
 
-        # Sign in first
+        # Check if the student has the pass.txt file.
+        if (not os.path.exists("/home/USERNAME_GOES_HERE/pass.txt")):
+            with output0:
+                output0.clear_output()
+                display(HTML("<span style='color: red;'>Please create ~/pass.txt before clicking Start Lab. This file must contain your SPHERE password.</span>"))
+                return
+        
+        # Sign in first.
         if not sign_in_student(output0):
             return
 
