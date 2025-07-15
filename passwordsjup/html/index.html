@@ -1,0 +1,123 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="index,nofollow">
+
+<title>Passwords: Cracking</title>
+
+
+
+
+<link rel="stylesheet" type="text/css" charset="utf-8" media="all" 
+href="../../css//common.css">
+<link rel="stylesheet" type="text/css" charset="utf-8" media="screen" 
+href="../../css//screen.css">
+
+</head><body dir="ltr" lang="en">
+
+<div id="page" dir="ltr" lang="en">
+<h1>Passwords - USC/ISI</h1>
+<div class="author">Created by: Jelena Mirkovic, USC/ISI, sunshine@isi.edu.<br>
+</div>
+
+<div class="table-of-contents">
+<div class="table-of-contents-heading">Contents</div>
+<ol type="1">
+<li><a href="#overview">Overview</a>
+</li><li><a href="#reading">Required Reading</a>
+
+</li><li><a href="#intro">Introduction</a>
+
+
+</li><li><a href="#assignment">Assignment Instructions</a>
+<ol>
+<li><a href="#setup">Setup</a>
+</li><li><a href="#tasks">Tasks</a>
+<ol>
+  <li><a href="#crack">Cracking passwords</a>
+</ol>
+
+</li><li><a href="#glitches">What Can Go Wrong</a>
+</li></ol>
+</li><li><a href="#submission">Submission Instructions</a>
+
+</li></ol>
+</div>
+
+<span class="anchor" id="overview"></span> 
+<h2>Overview</h2>
+
+This exercise teaches students how to crack passwords and demonstrates how easily can a password be cracked. 
+
+
+<span class="anchor" id="reading"></span> 
+<h2>Required Reading</h2>
+
+<ul>
+<li><A HREF="http://blog.erratasec.com/2012/06/linkedin-vs-password-cracking.html#.WfevdhNSz_R" target="new">How to crack passwords using Hashcat</A>
+<li><A HREF="http://www.openwall.com/john/doc/EXAMPLES.shtml" target="new">How to use John the Ripper</A>
+</ul>
+
+
+<span class="anchor" id="intro"></span> 
+<h2>Introduction</h2>
+
+Everyone uses passwords. They have many advantages - they are often easier to remember than other alternatives, users are familiar with the concept and all servers support them. But they also have many disadvantages. Users create passwords that are easily guessed by automated programs with dictionaries. Users also tend to reuse their passwords on multiple servers, making it possible to compromise one server, crack the passwords and then use them to access other accounts by the same user.
+
+This exercise demonstrates the "easily guessed" part of the problem. Students will be asked to use popular password cracking tools to crack a few commonly used passwords. 
+
+<span class="anchor" id="assignment"></span> 
+<h2>Assignment Instructions</h2>
+
+
+<span class="anchor" id="setup"></span>
+<div class="level3"><h3>Setup</h3>
+<h3 class="anchor" id="setup">Setup</h3>
+<ol>
+	<ol type="1"><li><p />If you don't have an account, follow the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/">here</a>.
+</li><li>Create an instance of this exercise by following the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/#working-on-assignments">here</a>, using <font color=red>passwords</font> as Lab name.  Your topology will look like below:<p><img src="topo.png">.
+</li><li>After setting up the lab, access your <tt>pass</tt> node. <p /></ol></ol><p />
+
+</div>
+
+<span class="anchor" id="tasks"></span>
+<div class="level3">
+<h3>Tasks</h3>
+<div class="level3">
+<span class="anchor" id="crack"></span>
+<h4>Cracking passwords</h4>
+</a>
+<p>You will find the passwords to crack in <tt>/var/passwords</tt> directory. They are stored as hashes, along with the usernames they belong to. This file is obtained directly from <tt>/etc/passwd</tt> and <tt>/etc/shadow</tt> files by using John the Ripper's <tt>unshadow</tt> utility.
+
+<p>Your task is to crack as many passwords you can <b>from this file</b>. <font color=red>Please do not attempt to crack real users' passwords on SPHERE as this is illegal.</font>
+  Please take careful notes of what commands you used with what options
+  and how long (roughly, in 4h increments is fine) it took to crack each password. Cracking may take long so make sure to:
+  <ol>
+    <li>Modify your experiment's settings to make it swap out after 4h thus giving you a bit of extra time.
+    <li>Use nohup before your command and spawn the process like this:
+      <pre>
+	nohup john /var/passwords &
+      </pre>
+      so the cracking would continue to run after you break the SSH connection to your node.
+    <li>Use John the Ripper's resume option to resume when you swap in later to continue where you left off.
+  </ol>
+
+</div>
+
+
+<div class="level3">
+<h3>What can go wrong</h3>
+
+<ul>
+<li><b>Experiment cannot be swapped in</b>. First, check the error message you will receive in the email. One possible reason for this is that the NS file was changed from the one listed above. Verify that the file looks exactly like supplied with this exercise. Another reason may be that there is a lack of available nodes in SPHERE and the error message will say so. This happens ocassionally and usually resources become available in a few hours. If you tried several times and could not find enough resources or could not diagnose why the experiment was not swapping in, forward the error message you get from SPHERE to your TA.
+</ul>
+
+</div>
+<h2>Submission Instructions</h2>
+Please submit the list of cracked passwords and note which command was used to crack each password. Also note how long it took (roughly) for each password to be cracked. For example, if I ran the command <tt> john /var/passwords </tt> and it cracked password for user <tt>anne</tt> during the first swapin (4 hours), and the password were <tt>abc</tt> I would write: <tt>user:anne pass:abc command:john time:4h</tt>
+
+</div>
+</body></html>

@@ -1,0 +1,2 @@
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y john
+cd /tmp/pass; sudo cp passwords /var/passwords
