@@ -22,6 +22,7 @@ class LabInitial(Enum):
     F = "firewalls"
     SY = "synflood"
     M = "mitm"
+    W = "worm"
 
 def save_notebook(labname):
     with save_lock:

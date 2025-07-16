@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+host=`hostname | awk -F'.' '{print $1}'`
+tar -xzf /tmp/$host/paws.tgz
+apt update -y
+apt install gcc build-essential -y
+

@@ -1,0 +1,9 @@
+from mergexp import *
+# create a topology named 'worm'
+net = Network('worm', addressing==ipv4, routing==static)
+nodes = [net.node(name, image == 'bullseye-edu') for name in [ 'node-0','node-1']]
+lanlan0 = net.connect([nodes[0],nodes[1]])
+lanlan0[nodes[0]].socket.addrs = ip4('10.1.1.2/24')
+lanlan0[nodes[1]].socket.addrs = ip4('10.1.1.3/24')
+experiment(net)
+
