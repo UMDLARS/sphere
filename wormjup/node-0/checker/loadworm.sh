@@ -11,7 +11,7 @@ mkdir -p $TMP
 pushd $TMP
 
 # Move the tarball to the temp directory and extract it.
-mv ~/${USER}_worm.tar.gz $TMP
+mv /tmp/${USER}_worm.tar.gz $TMP
 tar -xvf "${USER}_worm.tar.gz"
 
 # Restore local logs from node-0.
@@ -19,8 +19,8 @@ tar -xvf "${USER}_worm.tar.gz"
 [ -e "$TMP/log_2_node-0" ] && cp "$TMP/log_2_node-0" ~/log_2
 
 # Restore remote logs to node-1.
-[ -e "$TMP/log_node-1" ] && scp "$TMP/log_node-1" node-1:~/log
-[ -e "$TMP/log_2_node-1" ] && scp "$TMP/log_2_node-1" node-1:~/log_2
+[ -e "$TMP/log_node-1" ] && scp -o StrictHostKeyChecking=no "$TMP/log_node-1" node-1:~/log
+[ -e "$TMP/log_2_node-1" ] && scp -o StrictHostKeyChecking=no "$TMP/log_2_node-1" node-1:~/log_2
 
 # Restore step_1_check.txt and run make if needed.
 if [ -e "$TMP/home/.checker/responses/step_1_check.txt" ]; then
@@ -33,7 +33,7 @@ if [ -e "$TMP/home/.checker/responses/step_1_check.txt" ]; then
     fi
 
     # Run "sudo make" on node-1.
-    ssh node-1 'sudo make -C /tmp/node-1/paws'
+    ssh -o StrictHostKeyChecking=no node-1 'sudo make -C /tmp/node-1/paws'
 fi
 
 # Return to the previous directory.
