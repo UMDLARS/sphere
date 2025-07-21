@@ -1,0 +1,326 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!-- saved from url=(0076)https://www.isi.deterlab.net/file.php?file=/share/shared/TCPSYNFloodexercise -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+
+
+
+<meta name="robots" content="index,nofollow">
+
+<title>Binary Analysis: An Introduction to Dwarf</title>
+
+
+
+
+<link rel="stylesheet" type="text/css" charset="utf-8" media="all" 
+href="../../css//common.css">
+<link rel="stylesheet" type="text/css" charset="utf-8" media="screen" 
+href="../../css//screen.css">
+</head><body dir="ltr" lang="en">
+
+<div id="page" dir="ltr" lang="en">
+<h1>An Introduction to Dwarf</h1>
+<div class="author">Created by: Sima Arasteh, Jelena Mirkovic and Christophe Hauser, USC/ISI, {sarasteh, mirkovic, hauser}@isi.edu<br>
+</div>
+
+<div class="table-of-contents">
+<div class="table-of-contents-heading">Contents</div>
+<ol type="1">
+<li><a href="#overview">Overview</a>
+  
+ 
+
+</li><li><a href="#reading">Required Reading</a>
+  <ol>
+    <li><a href="#def">What is a binary file?</a>
+      <li><a href="#type">Binary Types</a>
+    <li><a href="#sec">Debug Sections in binary</a></li>
+    <ol>
+      <li><a href="#infosec">Debug Info Section</a></li>
+      <li><a href="#codedes">Code description</a></li>
+      
+      <li><a href="#line">Debug_Line section</a></li>
+
+    </ol>
+
+  </ol>
+
+</li><li><a href="#assignment">Assignment Instructions</a>
+	
+	<ol>
+<li><a href="#setup">Setup </a>
+  <li><a href="#code">Analyze binary2.out</a>
+</ol>
+</li>
+</li><li><a href="#submission">Submission Instructions</a>
+
+</li></ol>
+</div>
+
+<span class="anchor" id="overview"></span> 
+<h2>Overview</h2>
+
+<p> In this exercise, we review different types of compiled binaries and the structure of debugging information
+	in binary programs, and we will learn how debuggers use this information. 
+</p>
+
+
+
+</p><h2 class="anchor" id="reading">Required Reading</h2>
+<h3 class="anchor" id="def">What is a binary file?</h3>
+
+
+<p> 
+	A binary file is a compiled file from a source code that contains machine code. A binary file has different types, such as
+	executable, object file, etc.  In the next section, we discuss different types of binary files. 
+	</p>
+
+</p><h3 class="anchor" id="type">Binary Types</h3>
+
+<p>Binary program files have different types. The type of binary file is stored in the header section of the binary.
+	This section introduces three different types of binary files, including object files, executable, and dynamic shared library. 
+		
+</p><p> 
+	An object file is a compiled file that contains machine code. For instance, imagine that a program source code consists
+	 of two
+	source files, such as file1.c and file2.c. The compiler first compiles each file separately and creates two files, file1.o 
+	and file2.o, which are called object files or relocatable files.
+	An object file is not executable. This type of binary has a signature "ET_REL" in the binary header. 
+	In the later part of the compilation phase, the linker links these two files and any system libraries to make an executable file. After the linking phase,  
+	the output is an executable file, and we can run it. The type of output binary of this phase is 
+	executable type. This binary type has a 
+	signature "ET_EXEC" in the binary header. Another binary type is dynamic shared library which has a signature "ET_DYN"
+	 in the header file. The only difference 
+	between a dynamic shared library and an executable is that the library does not have an entry point, while an executable has. The entry point is a location in
+	 memory that defines where a compiled program
+	starts to be executed (e.g., main function in the program). 
+
+</p><p>The following code shows how to detect the type of binary. 
+  In order to run the code, we first need to install pyelftools, which is a parser for elf binaries. In your experiment pyelftools are already installed. 
+
+Below you can see analysis code we will use. You can also access this code on your <tt>analysis</tt> node, in <tt>/tmp/analysis</tt> directory. Change the 'path to binary' to point to binary1.out on your disk (also in <tt>/tmp/analysis</tt> directory).
+
+<div class="highlight" style="background: #f0f0f0"><pre style="line-height: 125%; font-size: small;"><span></span>
+from elftools.elf.elffile import ELFFile
+
+filename = 'path to binary'
+with open(filename, 'rb') as file:
+	elffile = ELFFile(file)
+	elf_type = elffile.header.e_type
+	print(elf_type)
+
+	</pre></div>
+</p>
+<p>When you type:
+  <pre>
+    python3 script1.py
+  </pre>
+  you should see "ET_DYN", which indicates that binary1.out is a dynamic shared library.
+
+<h3 class="anchor" id="sec">Debug Sections in Binary</h3>
+
+<p> When we compile a binary from the source code, we can compile it with the debug information (e.g., by supplying -g flag to gcc or g++). If debug information is
+	present, you are able to
+	extract more information about binary, such as mapping between source code line and memory offsets. 
+	In this exercise, we are focusing on ELF executable file format, which is an executable format in Linux binaries.
+	 The debugging information in Linux binaries is called "dwarf". the dwarf has 12 different sections, but
+	  we only focus on two debug sections, including debug info and debug_line sections.
+
+	</p><p> If you compile your binary with the -g command option, the binary will be compiled with debug information. 
+	If you want to analyze whether your binary file 
+		contains debug information or not, you can use the following command.
+		
+	<pre>file binary_file
+	</pre>
+	</p><p>If the binary file is compiled with debug information, you will see this result.
+		<pre >“with debug_info, not stripped”  
+		</pre>
+		For example, you will see this for binary1.out.
+		
+	</p><p> Now, we will dive into the details of two debug sections, debug_info, and debug_line section. Debug_info section contains global variables, 
+		functions, and its corresponding local variables information. Debug_line section contains the information about mapping between source code 
+		lines and memory addresses. 
+	</p><h4 class="anchor" id="infosec">Debug_Info section</h4>
+</p><p>Debug_info is a tree structure in a binary. The main component of this structure is called Debugging Information Entry or DIE. Each DIE has a
+     tag, type, and set of attributes. You can use different tools to print out the dwarf info of a binary. One of these tools is objdump. 
+<pre >objdump --dwarf=info binary_file
+</pre>
+</p>
+<p>The first DIE in the output of this command is the "compilation unit". As we previously mentioned, a source code can be split into different
+files. When the linker links the object files (created from these source files) to create an executable file, we have 
+a unit in the binary level, corresponding to each source file, which is called the compilation unit. In the debug info section, each compilation unit has a DIE with the tag "DW_TAG_compile_unit". 
+In the tree structure of a DIEs, the compilation unit is a root. If you look at the output of the command above for the binary binary1.out, you will see that binary1.out has two compilation
+units. 
+</p>
+
+<p>
+	Each source file may have several functions. In the tree structure of the debug info section, each function is a child of a compilation unit in which it was defined. 
+    In this structure, each function is defined with a tag DW_TAG_subprogram. In the picture below, you can see the structure of a DIE corresponding to a function.
+      <p>Each DIE has some attributes. The DW_AT_name can define the function name. In the example below, "badsink" is the name of the function. Each function
+    can have some parameters and local variables. In the debug info structure, function arguments and local variables are defined with "DW_TAG_formal_parameter"
+    and "DW_TAG_variable" tags, respectively. 
+</p>
+<p>
+	<div><img src="DIE.png" width="500" height="100"></div>
+
+	 
+</p>
+<p> Now we give a short script to extract the name of functions in the dwarf info section. You can access the code on <tt>analysis</tt> node in <tt>/tmp/analysis</tt> folder. The code is <tt>script2.py</tt>.</p>
+ 
+<p>This code will print the name of the functions in binary1.out, which have a "DW_TAG_subprogram" tag.</p>
+
+
+<p> This code prints the name of a function. If in the main function you print the type of die you will see it is an object of class 'elftools.dwarf.die.DIE'.
+     If in <a href="https://github.com/eliben/pyelftools/blob/master/elftools/dwarf/die.py">pyelftools repository</a> you look at DIE class attributes,
+      you will see that DIE has an attribute "tag" which defines the tag of a DIE and attributes. Then if you ask for the value of the attribute 
+      ('DW_AT_name') you can see the name of the function. 
+</p>
+
+Running this code with binary1.out should produce the following output:
+<pre>
+  python3 script2.py binary1.out
+  
+  Found a compile unit at offset 0, length 1045
+  Found a compile unit at offset 1049, length 1058
+CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51b_badSink
+main
+  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51_bad
+  </pre>
+
+</p><h4 class="anchor" id="line">Debug_line section</h4>
+
+<p>One of the other sections in debug information is the debug_line section. This section contains the mapping between 
+    a source code line and memory offset in the binary code. In other words, it contains information about which assembly instructions correspond to which source code lines. 
+    The debug_line section contains all the compilation units, and for each compilation unit, it contains the mapping between a source code line
+     and memory offsets. We first analyze this information using objdump. If you run this command in the terminal for binary1.out, you will see 
+     the output shown below. </p>
+<pre>objdump --dwarf=decodedline binary1.out
+
+binary1.out:     file format elf64-x86-64
+
+Contents of the .debug_line section:
+
+CU: ./CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51b.c:
+File name                            Line number    Starting address    View
+_Buffer_Overflow__CWE129_rand_51b.c           23              0x13a9
+_Buffer_Overflow__CWE129_rand_51b.c           23              0x13b8
+_Buffer_Overflow__CWE129_rand_51b.c           26              0x13c7
+_Buffer_Overflow__CWE129_rand_51b.c           29              0x13ef
+_Buffer_Overflow__CWE129_rand_51b.c           31              0x13f5
+_Buffer_Overflow__CWE129_rand_51b.c           33              0x1402
+_Buffer_Overflow__CWE129_rand_51b.c           33              0x1409
+_Buffer_Overflow__CWE129_rand_51b.c           35              0x140b
+_Buffer_Overflow__CWE129_rand_51b.c           33              0x141b
+_Buffer_Overflow__CWE129_rand_51b.c           33              0x141f
+_Buffer_Overflow__CWE129_rand_51b.c           43              0x1425
+_Buffer_Overflow__CWE129_rand_51b.c           40              0x1427
+_Buffer_Overflow__CWE129_rand_51b.c           43              0x1433
+_Buffer_Overflow__CWE129_rand_51b.c           43              0x144a
+
+
+CU: ./CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51a.c:
+File name                            Line number    Starting address    View
+_Buffer_Overflow__CWE129_rand_51a.c           26              0x144a
+_Buffer_Overflow__CWE129_rand_51a.c           29              0x1457
+_Buffer_Overflow__CWE129_rand_51a.c           31              0x145e
+_Buffer_Overflow__CWE129_rand_51a.c           31              0x146a
+_Buffer_Overflow__CWE129_rand_51a.c           31              0x1487
+_Buffer_Overflow__CWE129_rand_51a.c           31              0x14a4
+_Buffer_Overflow__CWE129_rand_51a.c           32              0x14a7
+_Buffer_Overflow__CWE129_rand_51a.c           33              0x14b1
+_Buffer_Overflow__CWE129_rand_51a.c           82              0x14b9
+_Buffer_Overflow__CWE129_rand_51a.c           84              0x14cc
+_Buffer_Overflow__CWE129_rand_51a.c           84              0x14d6
+_Buffer_Overflow__CWE129_rand_51a.c           91              0x14dd
+_Buffer_Overflow__CWE129_rand_51a.c           92              0x14e9
+_Buffer_Overflow__CWE129_rand_51a.c           93              0x14f3
+_Buffer_Overflow__CWE129_rand_51a.c           95              0x14ff
+_Buffer_Overflow__CWE129_rand_51a.c           96              0x1504
+_Buffer_Overflow__CWE129_rand_51a.c           96              0x1506
+</pre>
+
+<p>Since a binary may contain different compilation units, you should first determine which source line number 
+     belongs to which function. Once you have the function name, you can easily extract the compilation unit of this function from a DIE in 
+the dwarf info section, and then you can explore its memory locations.
+
+</p>
+<p>The code below extracts the mapping between source code and memory offsets for each compilation unit. You can access the code on your <tt>analysis</tt> node in <tt>/tmp/analysis/</tt> folder. The code is <tt>script3.py</tt>.</p>
+
+<div class="highlight" style="background: #f0f0f0"><pre style="line-height: 125%; font-size: small;"><span></span>
+	import argparse
+	from elftools.elf.elffile import ELFFile
+	
+	def debug_line(binary_file):
+		lines_offsets = {}
+		with open(binary_file, 'rb') as file:
+			elffile = ELFFile(file)
+			if not elffile.has_dwarf_info():
+				print('  file has no DWARF info')
+				return
+			dwarfinfo = elffile.get_dwarf_info()
+			for CU in dwarfinfo.iter_CUs():
+				lines_program = []
+				cu_die = CU.get_top_DIE()
+				cu_name = cu_die.attributes['DW_AT_name'].value.decode()
+				lines = dwarfinfo.line_program_for_CU(CU)
+				debugsec_lines = lines.get_entries()
+				for line in debugsec_lines:
+					#print(line)
+					if line.state is not None:
+						lines_program.append((line.state.line,hex(line.state.address)))
+				lines_offsets[cu_name] = lines_program
+	
+		return lines_offsets
+	
+	if __name__ == '__main__':
+		parser = argparse.ArgumentParser()
+		parser.add_argument('binary', help='path to binary folder')
+		parser.add_argument('line_number', help='cu')
+		args = parser.parse_args()
+		binary_file = args.binary
+		lines_offsets = debug_line(binary_file)
+		print(lines_offsets)
+	
+	
+  </pre>
+
+  When you run it you should see the output like below:
+  <pre>
+    python3 script3.py binary1.out
+    
+    {'CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51b.c': [(23, '0x13a9'), (23, '0x13b8'), (26, '0x13c7'), (29, '0x13ef'), (31, '0x13f5'), (33, '0x1402'), (33, '0x1409'), (35, '0x140b'), (33, '0x141b'), (33, '0x141f'), (43, '0x1425'), (40, '0x1427'), (43, '0x1433'), (43, '0x144a')], 'CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_51a.c': [(26, '0x144a'), (29, '0x1457'), (31, '0x145e'), (31, '0x146a'), (31, '0x1487'), (31, '0x14a4'), (32, '0x14a7'), (33, '0x14b1'), (82, '0x14b9'), (84, '0x14cc'), (84, '0x14d6'), (91, '0x14dd'), (92, '0x14e9'), (93, '0x14f3'), (95, '0x14ff'), (96, '0x1504'), (96, '0x1506')]}
+    </pre>
+</div>
+
+
+
+</p>
+</p></div>
+</p><h2 class="anchor" id="assignment">Assigment Instructions</h2>
+In this excersie, you will practice everything you have learned. For this assigment, we will use the file binary2.out from <tt>/tmp/analysis</tt> on your <tt>analysis</tt> node. 
+
+<h3 class="anchor" id="setup">Setup</h3>
+<ol>
+	<ol type="1"><li><p />If you don't have an account, follow the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/">here</a>.
+</li><li>Create an instance of this exercise by following the instructions <a href="https://mergetb.gitlab.io/testbeds/sphere/sphere-docs/docs/experimentation/classes/#working-on-assignments">here</a>, using <font color=red>dwarf</font> as Lab name.  Your topology will look like below:<p><img src="topo.png">.
+</li><li>After setting up the lab, access your <tt>analysis</tt> node. <p /></ol></ol><p />
+
+<h3 class="anchor" id="code">Analyze binary2.out</h3>
+
+    <ol>
+    <li> Run script1.py for binary2.out.  What is the type of this binary? Explain what this means.
+    <li> Check if the binary file is compiled with debug symbols. Explain how you found that out?
+    <li> Find out how many compilation units this binary has? Print the name of each.
+    <li> Write a script to print the name of functions for each compilation unit and the name of arguments and local variables for each function.  Run it and show the output. You can start with script2.py and modify it.
+    <li> Write a script to extract memory offsets corresponding to line number 33 for each compilation unit. Run it and show the output. You can start with script3.py and modify it.
+      </ol>
+</pre></div>
+
+<h2 class="anchor" id="submission">Submission Instructions</h2>
+
+Please submit your answers to questions in Section "Analyze binary2.out" and your two scripts. 
+
+
+</div>
+
+</body></html>

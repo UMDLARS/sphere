@@ -1,0 +1,7 @@
+export STUDENT=USERNAME_GOES_HERE
+cd /tmp/analysis; cp * /home/`cat user`/; cd /home/`cat user`/
+pip3 install -i https://pypi.org/project/ pyelftools
+cp -r /tmp/checker /home/.checker
+mkdir /home/.checker/responses
+chown -R $STUDENT:$STUDENT /home/.checker
+
