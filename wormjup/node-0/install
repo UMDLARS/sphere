@@ -1,6 +1,10 @@
 #!/usr/bin/bash
+export STUDENT=USERNAME_GOES_HERE
 host=`hostname | awk -F'.' '{print $1}'`
 tar -xzf /tmp/$host/paws.tgz
 apt update -y
 apt install gcc build-essential -y
-
+cp -r /tmp/node-0/checker /home/.checker
+rm -rf /tmp/node-0/checker
+mkdir /home/.checker/responses
+sudo chown -R $STUDENT:$STUDENT /home/.checker

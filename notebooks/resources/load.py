@@ -3,13 +3,30 @@ import subprocess
 import sys
 import os
 import time
+from enum import Enum
 
-SSH_KEY = "/home/USERNAME_GOES_HERE/.ssh/merge_key"
-USER = "USERNAME_GOES_HERE"
+SSH_KEY = "/home/umdclassmjwb/.ssh/merge_key"
+USER = "umdclassmjwb"
 REMOTE_SERVER = "server"
 SAVE_DIR = f"/home/{USER}/saves"
 
-SPECIAL_LABS = {"xss", "firewalls", "synflood"}
+from enum import Enum
+
+class LabHost(Enum):
+    XSS = "server"
+    SYNFLOOD = "server"
+    FIREWALLS = "server"
+    WORM = "node-0"
+
+    @staticmethod
+    def get_host(labname: str) -> str:
+        mapping = {
+            "xss": LabHost.XSS,
+            "synflood": LabHost.SYNFLOOD,
+            "firewalls": LabHost.FIREWALLS,
+            "worm": LabHost.WORM
+        }
+        return mapping.get(labname.lower(), labname).value
 
 def run_command(command: str):
     return subprocess.run(command, shell=True, stdout=subprocess.DEVNULL)
@@ -21,7 +38,7 @@ def is_node_reachable(host: str) -> bool:
 def transfer_tarball(labname: str, host: str) -> bool:
     local_tarball = os.path.join(SAVE_DIR, f"{USER}_{labname}.tar.gz")
     remote_path = f"{USER}@{host}:/tmp"
-    cmd = f"scp -i {SSH_KEY} {local_tarball} {remote_path}"
+    cmd = f"scp -i {SSH_KEY} -o StrictHostKeyChecking=no {local_tarball} {remote_path}"
     run_command(cmd)
 
     # Wait until the file appears on the remote side
@@ -34,7 +51,7 @@ def transfer_tarball(labname: str, host: str) -> bool:
 
 def run_load_script(labname: str, host: str):
     load_script = f"/home/.checker/load{labname}.sh"
-    cmd = f"ssh -i {SSH_KEY} {USER}@{host} '{load_script}'"
+    cmd = f"ssh -i {SSH_KEY} -o StrictHostKeyChecking=no {USER}@{host} '{load_script}'"
     run_command(cmd)
 
 def main():
@@ -43,18 +60,18 @@ def main():
         sys.exit(1)
 
     labname = sys.argv[1]
+    host = LabHost.get_host(labname)
 
-    scp_host = REMOTE_SERVER if labname in SPECIAL_LABS else labname
-
-    if not is_node_reachable(scp_host):
+    if not is_node_reachable(host):
         sys.exit(2)
 
     print("Node is reachable. Transferring backup...")
-    if transfer_tarball(labname, scp_host):
+    if transfer_tarball(labname, host):
         print("Transfer confirmed. Executing load script...")
-        run_load_script(labname, scp_host)
+        run_load_script(labname, host)
         print("Load script executed.")
 
     sys.exit(1)
+
 
 main()
