@@ -10,19 +10,21 @@ mkdir -p $TMP
 # Change to the temporary directory.
 pushd $TMP
 
-# Save the logs from node-1.
-scp node-1:~/log* "$TMP"
+# Save logs from node-1 and rename them.
+scp node-1:~/log "$TMP/log_node-1" 2>/dev/null
+scp node-1:~/log_2 "$TMP/log_2_node-1" 2>/dev/null
 
-# Save the logs from node-0 (here).
-cp ~/log* "$TMP" 2>/dev/null
+# Save logs from node-0 (local) and rename them.
+[ -e ~/log ] && cp ~/log "$TMP/log_node-0"
+[ -e ~/log_2 ] && cp ~/log_2 "$TMP/log_2_node-0"
 
-# Check to see if the C files were made.
+# Save step_1_check.txt if it exists.
 if [ -e "/home/.checker/responses/step_1_check.txt" ]; then
     mkdir -p "$TMP/home/.checker/responses"
     cp "/home/.checker/responses/step_1_check.txt" "$TMP/home/.checker/responses/"
 fi
 
-# Creating the save.
+# Create tarball.
 tar -cvf "${USER}_worm.tar.gz" .
 mv "${USER}_worm.tar.gz" ~
 
