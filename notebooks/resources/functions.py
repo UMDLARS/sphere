@@ -23,6 +23,7 @@ class LabInitial(Enum):
     SY = "synflood"
     M = "mitm"
     W = "worm"
+    D = "dwarf"
 
 def save_notebook(labname):
     with save_lock:
