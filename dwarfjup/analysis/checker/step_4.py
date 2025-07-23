@@ -9,12 +9,14 @@ def main():
         print("Usage: ./step_4.py")
         sys.exit(3)
 
+    tmp_dir = "/tmp/analysis/"
+
     # Make sure that the file exists.
-    if (not os.path.exists("/tmp/analysis/script2_modified.py")):
+    if (not os.path.exists(f"{tmp_dir}/script2_modified.py")):
         sys.exit(1)
 
     # Running the file.
-    result = subprocess.run(['python3', 'script2_modified.py'], capture_output=True, text=True)
+    result = subprocess.run(['python3', f'{tmp_dir}/script2_modified.py', f'{tmp_dir}/binary1.out'], capture_output=True, text=True)
 
     # Check if it ran properly.
     if (result.returncode != 0):
@@ -26,7 +28,7 @@ def main():
     f.close()
 
     # Now, creating the copy.
-    shutil.copyfile("/tmp/analysis/script2_modified.py", "/home/.checker/responses/")
+    shutil.copyfile(f"{tmp_dir}/script2_modified.py", "/home/.checker/responses/script2_modified.py")
 
     # Exiting successfully.
     sys.exit(0)

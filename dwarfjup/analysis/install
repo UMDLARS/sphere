@@ -1,5 +1,6 @@
 export STUDENT=USERNAME_GOES_HERE
 cd /tmp/analysis; cp * /home/`cat user`/; cd /home/`cat user`/
+sudo apt-get update; sudo apt-get install pip
 pip3 install -i https://pypi.org/project/ pyelftools
 cp -r /tmp/checker /home/.checker
 mkdir /home/.checker/responses

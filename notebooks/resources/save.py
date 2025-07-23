@@ -5,16 +5,17 @@ import os
 import time
 from enum import Enum
 
-SSH_KEY = "/home/umdclassmjwb/.ssh/merge_key"
-USER = "umdclassmjwb"
+SSH_KEY = "/home/USERNAME_GOES_HERE/.ssh/merge_key"
+USER = "USERNAME_GOES_HERE"
 REMOTE_SERVER = "server"
-SAVE_DIR = "/home/umdclassmjwb/saves"
+SAVE_DIR = "/home/USERNAME_GOES_HERE/saves"
 
 class LabHost(Enum):
     XSS = "server"
     SYNFLOOD = "server"
     FIREWALLS = "server"
     WORM = "node-0"
+    DWARF = "analysis"
 
     @staticmethod
     def get_host(labname: str) -> str:
@@ -22,7 +23,8 @@ class LabHost(Enum):
             "xss": LabHost.XSS,
             "synflood": LabHost.SYNFLOOD,
             "firewalls": LabHost.FIREWALLS,
-            "worm": LabHost.WORM
+            "worm": LabHost.WORM,
+            "dwarf": LabHost.DWARF
         }
         return mapping.get(labname.lower(), labname).value
 
