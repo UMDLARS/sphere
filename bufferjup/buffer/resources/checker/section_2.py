@@ -14,7 +14,7 @@ def main():
     step = sys.argv[1]
 
     # We need the student's username throughout this entire lab.
-    username = "USERNAME_GOES_HERE"
+    username = "USERNAME_FOR_NODE"
     pathname = f"/home/{username}/topic_2"
 
     # Every step in this section is VERY similar to one another. No need for checking the individual steps.

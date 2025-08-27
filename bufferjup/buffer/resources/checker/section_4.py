@@ -17,7 +17,7 @@ def main():
     check_test = sys.argv[3]
 
     # We need the student's username throughout this entire lab.
-    username = "USERNAME_GOES_HERE"
+    username = "USERNAME_FOR_NODE"
 
     # Depending if check_test is 0 or 1, we will need to check to see if the student is running the unedited or fixed Wormwood.
     if (check_test == "0"):
