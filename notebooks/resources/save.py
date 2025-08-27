@@ -10,23 +10,21 @@ USER = "USERNAME_GOES_HERE"
 REMOTE_SERVER = "server"
 SAVE_DIR = "/home/USERNAME_GOES_HERE/saves"
 
-class LabHost(Enum):
-    XSS = "server"
-    SYNFLOOD = "server"
-    FIREWALLS = "server"
-    WORM = "node-0"
-    DWARF = "analysis"
+SPECIAL_HOSTS = {
+    "xss": "server",
+    "synflood": "server",
+    "firewalls": "server",
+    "worm": "node-0",
+    "dwarf": "analysis",
+}
 
-    @staticmethod
-    def get_host(labname: str) -> str:
-        mapping = {
-            "xss": LabHost.XSS,
-            "synflood": LabHost.SYNFLOOD,
-            "firewalls": LabHost.FIREWALLS,
-            "worm": LabHost.WORM,
-            "dwarf": LabHost.DWARF
-        }
-        return mapping.get(labname.lower(), labname).value
+def get_host(labname: str) -> str:
+    """
+    Return the remote host for a given lab.
+    Uses SPECIAL_HOSTS if labname has a mapping,
+    otherwise assumes host == labname.
+    """
+    return SPECIAL_HOSTS.get(labname.lower(), labname)
 
 def run_ssh_command(host: str, command: str):
     subprocess.run(
@@ -52,9 +50,9 @@ def main():
     temp_filename = f"{final_filename}.new"
     remote_tarball = os.path.basename(final_filename)
 
-    host = LabHost.get_host(labname)
+    host = get_host(labname)
 
-    if labname == "firewalls":
+    if labname.lower() == "firewalls":
         run_ssh_command(host, "bash -l -c '/home/.checker/savefirewalls.sh'")
     else:
         run_ssh_command(host, f"/home/.checker/save{labname}.sh")
@@ -72,5 +70,5 @@ def main():
     run_ssh_command(host, f"rm -f {remote_tarball} &> /dev/null")
     print("Remote tarball removed.")
 
-
-main()
+if __name__ == "__main__":
+    main()
