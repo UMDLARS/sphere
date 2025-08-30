@@ -9,8 +9,8 @@ const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 
 // URLs for the two users.
-const victim_url = "http://10.0.1.1/xss_practice.php?auth=XXX";
-const umdsec_url = "http://10.0.1.1/xss_practice.php?auth=XXX";
+const victim_url = "http://10.0.1.1/xss_practice.php?auth=z8pivtWHdXKRS9ks2RyqSQsuM0aaxyFy";
+const umdsec_url = "http://10.0.1.1/xss_practice.php?auth=UMsVqXewPzULMBUfb71mhXeu8ai2ruHl";
 
 // This is the "main" function that gets called.
 async function run(step) {
@@ -96,11 +96,11 @@ async function run(step) {
         // In case the student is running this step without the "keep work" boolean, then the rest
         // of the check can easily be made here. Just compare the two strings, then return a value.
         if (content1 !== content3) {
-            process.exit(1);
+            process.exit(0);
         }
 
         else {
-            process.exit(0);
+            process.exit(1);
         }
     }
 
@@ -129,15 +129,15 @@ async function run(step) {
         if (content1 !== content3) {
             // Now, check to see if content3 has the victim's URL in it.
             if (content3.includes(victim_url)) {
-                process.exit(1);
+                process.exit(0);
             }
 
             // Otherwise, exit with 0.
-                process.exit(0);
+                process.exit(1);
         }
 
         else {
-            process.exit(0);
+            process.exit(1);
         }
     }
 
