@@ -160,7 +160,7 @@ def main():
                 start_telnet_session(process, "wikipedia.com", 443)
                 forceful_exit(process)
                 
-                start_telnet_session(process, "google.com", 443)
+                start_telnet_session(process, "d.umn.edu", 443)
                 forceful_exit(process)
                 
                 start_telnet_session(process, "github.com", 443)
