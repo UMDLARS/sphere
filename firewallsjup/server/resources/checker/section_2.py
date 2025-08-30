@@ -32,7 +32,7 @@ def main():
             # Before exiting unsuccessfully, check to see if the student answered it before.
             if (os.path.exists("/home/.checker/responses/step_5_response.txt")):
                 f = open("/home/.checker/responses/step_5_response.txt", "r")
-                content = f.open()
+                content = f.read()
                 f.close()
 
                 if ("-A OUTPUT -p tcp -m tcp --dport 80 -j DROP" in content):
