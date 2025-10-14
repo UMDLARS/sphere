@@ -28,7 +28,7 @@ class LabHost(Enum):
             "worm": LabHost.WORM,
             "dwarf": LabHost.DWARF
         }
-        return mapping.get(labname.lower(), labname).value
+        return getattr(mapping.get(labname.lower()), "value", labname)
 
 def run_command(command: str):
     return subprocess.run(command, shell=True, stdout=subprocess.DEVNULL)
