@@ -19,7 +19,7 @@ deb http://archive.ubuntu.com/ubuntu ${CODENAME} main restricted universe multiv
 deb http://archive.ubuntu.com/ubuntu ${CODENAME}-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu ${CODENAME}-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu ${CODENAME}-security main restricted universe multiverse
-EOF' > 2/dev/null
+EOF' 2>/dev/null
 
 sudo apt-get -qq clean
 
