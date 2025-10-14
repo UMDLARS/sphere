@@ -12,6 +12,17 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+### NOTICE: rsync is required for this script to run smoothly. SPHERE's current Ubuntu has reached EOL,
+### and rsync will not install. These next few commands are to use an ESR version of rsync.
+sudo bash -c 'CODENAME=$( . /etc/os-release; echo "$UBUNTU_CODENAME" ); cat > /etc/apt/sources.list <<EOF
+deb http://archive.ubuntu.com/ubuntu ${CODENAME} main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu ${CODENAME}-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu ${CODENAME}-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu ${CODENAME}-security main restricted universe multiverse
+EOF' > 2/dev/null
+
+sudo apt-get -qq clean
+
 # Define the directory where the repository should be checked out.
 REPO_URL="https://github.com/UMDLARS/sphere"
 
