@@ -30,29 +30,21 @@ fi
 
 # Check if /collections/ exists, move it if it does.
 if [ -d "${TMP}/collections/" ]; then
-    sudo mv "${TMP}/collections/" "/"
+    sudo rm -rf "/collections"
+    sudo mv "${TMP}/collections" "/"
 fi
 
 # Checking if other users have been made and move them if they exist.
-if [ -d "${TMP}/home/ash" ]; then
-    sudo mv "${TMP}/home/ash/" "/home/"
-fi
-
-if [ -d "${TMP}/home/brock" ]; then
-    sudo mv "${TMP}/home/brock/" "/home/"
-fi
-
-if [ -d "${TMP}/home/misty" ]; then
-    sudo mv "${TMP}/home/misty/" "/home/"
-fi
-
-if [ -d "${TMP}/home/james" ]; then
-    sudo mv "${TMP}/home/james/" "/home/"
-fi
+for user in ash brock misty james; do
+    if [ -d "${TMP}/home/$user" ]; then
+        sudo rm -rf "/home/$user"
+        sudo mv "${TMP}/home/$user" "/home/"
+    fi
+done
 
 # Check if the student has responses, and move them if they do.
 if [ -d "${TMP}/home/.checker/responses" ]; then
-    sudo mv "${TMP}/home/.checker/responses/" "/home/.checker/"
+    sudo mv "${TMP}/home/.checker/responses/"* "/home/.checker/responses/"
 fi
 
 # Copy the users/groups back. These "merge" the users back into /etc/*.
