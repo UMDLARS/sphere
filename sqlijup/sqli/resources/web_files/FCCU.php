@@ -36,7 +36,7 @@ if (!isset($_POST['id']) || !isset($_POST['password'])) {
 	/*** Block #1: CONVERT TO PREPARED STATEMENT ***/
 	$query = "SELECT * FROM accounts WHERE id = $id AND password = '$password'";
 	debug($query);
-        $result = $mysqli->query($query) or die($mysqli->error());
+        $result = $mysqli->query($query) or die($mysqli->error);
 	$row =  $result->fetch_array(); // there should be only one row
 	/*************************************/
 
@@ -80,7 +80,7 @@ if (!isset($_POST['id']) || !isset($_POST['password'])) {
 
 		/*** Block #2: CONVERT TO PREPARED STATEMENT ***/
 		$query = "SELECT * FROM accounts WHERE id = $id AND password = '$password'";
-                $result = $mysqli->query($query) or die($mysqli->error());
+                $result = $mysqli->query($query) or die($mysqli->error);
                 $row = $result->fetch_array(); // there should be only one row
 		/*************************************/
 
@@ -89,7 +89,7 @@ if (!isset($_POST['id']) || !isset($_POST['password'])) {
 		// get current account list by name
 
 		$query = "SELECT first, last FROM accounts ORDER BY last";
-		$names = $mysqli->query($query) or die($mysqli->error());
+		$names = $mysqli->query($query) or die($mysqli->error);
 		account_actions($row, $names);
 	}
 
@@ -107,7 +107,7 @@ function name_to_id($name) {
 	
 	/*** Block #3: CONVERT TO PREPARED STATEMENT ***/
         $query = "SELECT id FROM accounts WHERE first = '$splitname[1]' AND last = '$splitname[0]'";
-	$result = $mysqli->query($query) or die($mysqli->error());
+	$result = $mysqli->query($query) or die($mysqli->error);
 	$row = $result->fetch_array();
 	/*************************************/
 
@@ -140,7 +140,7 @@ function withdraw_cash($id, $password, $amount) {
 	
 	/*** Block #4: CONVERT TO PREPARED STATEMENT ***/
 	$query = "SELECT bal FROM accounts WHERE password = '$password' AND id = $id";
-	$result = $mysqli->query($query) or die ($mysqli->error());
+	$result = $mysqli->query($query) or die ($mysqli->error);
 	$row = $result->fetch_array();
 	/*************************************/
 
@@ -152,7 +152,7 @@ function withdraw_cash($id, $password, $amount) {
 
 		/*** Block #5: CONVERT TO PREPARED STATEMENT ***/
 		$query = "UPDATE accounts SET bal = $giver_has WHERE password = '$password' AND id = $id LIMIT 1";
-		$mysqli->query($query) or die($mysqli->error());
+		$mysqli->query($query) or die($mysqli->error);
 		/*************************************/
 
 		echo "<h2 align='center'>Cash withdrawal of $$amount complete.</h2>
@@ -175,7 +175,7 @@ function wire_funds($id, $password,  $bank, $account, $amount) {
 	/*** Block #6: CONVERT TO PREPARED STATEMENT ***/
 	$query = "SELECT bal FROM accounts WHERE password = '$password' AND id = $id";
 	debug($query);
-	$result = $mysqli->query($query) or die($mysqli->error());
+	$result = $mysqli->query($query) or die($mysqli->error);
 	$row = $result->fetch_array();
 	/*************************************/
 
@@ -188,7 +188,7 @@ function wire_funds($id, $password,  $bank, $account, $amount) {
 		/*** Block #7: CONVERT TO PREPARED STATEMENT ***/
 		$query = "UPDATE accounts SET bal = $giver_has WHERE password = '$password' AND id = $id LIMIT 1";
 		debug($query);
-		$mysqli->query($query) or die($mysqli->error());
+		$mysqli->query($query) or die($mysqli->error);
 		/*************************************/
 
 		echo "<h2 align='center'>Wire of $$amount to bank ($bank) account ($account) complete.</h2>\n";
@@ -220,7 +220,7 @@ function transfer_funds($giver_id, $password, $recipient, $amount) {
 	/*** Block #8: CONVERT TO PREPARED STATEMENT ***/
 	$query = "SELECT bal FROM accounts WHERE id = $giver_id";
 	debug($query);
-	$result = $mysqli->query($query) or die($mysqli->error());
+	$result = $mysqli->query($query) or die($mysqli->error);
 	$row = $result->fetch_array();
 	/*************************************/
 
@@ -229,7 +229,7 @@ function transfer_funds($giver_id, $password, $recipient, $amount) {
 	/*** Block #9: CONVERT TO PREPARED STATEMENT ***/
 	$query = "SELECT bal FROM accounts WHERE id = $recipient_id";
 	debug($query);
-	$result = $mysqli->query($query) or die($mysqli->error());
+	$result = $mysqli->query($query) or die($mysqli->error);
 	$row = $result->fetch_array();
 	/*************************************/
 
@@ -242,10 +242,10 @@ function transfer_funds($giver_id, $password, $recipient, $amount) {
 		$recipient_has = $recipient_has + $amount;
 		$query = "UPDATE accounts SET bal = $recipient_has WHERE id = $recipient_id LIMIT 1";
 		debug($query);
-		$mysqli->query($query) or die($mysqli->error());
+		$mysqli->query($query) or die($mysqli->error);
 		$query = "UPDATE accounts SET bal = $giver_has WHERE password = '$password' AND id = $giver_id LIMIT 1";
 		debug($query);
-		$mysqli->query($query) or die($mysqli->error()); // does anyone know what it is?
+		$mysqli->query($query) or die($mysqli->error); // does anyone know what it is?
 		echo "<h2 align='center'>Transfer of $$amount to $recipient complete.</h2>\n";
 	} else {
 		action_error("Problem with employee fund transfer!",
