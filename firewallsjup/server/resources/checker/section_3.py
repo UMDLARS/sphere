@@ -107,9 +107,9 @@ def main():
 
                     sys.exit(0)
 
-            # The IP for Google cannot be found in their answer.
-            else:
-                sys.exit(3)
+        # The IP for Google cannot be found in their answer.
+        else:
+            sys.exit(3)
 
 
         # If the student reaches here, there was never a complete match. Likely due to the incorrect IP
