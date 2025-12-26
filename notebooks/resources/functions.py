@@ -25,6 +25,30 @@ class LabInitial(Enum):
     W = "worm"
     D = "dwarf"
 
+# This is going to be called whenever the lab has finished installing.
+# Fixes a possible race condition with SPHERE's runlab command.
+def verify_install(labname):
+    # Checking to see if the source files are added.
+    cmd = (
+        "ssh -o StrictHostKeyChecking=no "
+        "-i /home/USERNAME_GOES_HERE/.ssh/merge_key "
+        "USERNAME_GOES_HERE@intro "
+        "test -d /home/.checker"
+    )
+
+    result = subprocess.run(cmd, shell=True)
+
+    # If the directory doesn't exist, we re-run the command again.
+    if (result.returncode == 0):
+        subprocess.run(
+            ['bash', '/home/runlab', f'{labname}jup'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True
+        )
+
+    # Can implement a check to keep testing, but this should do for now.
+
 def save_notebook(labname):
     with save_lock:
         subprocess.run([
@@ -37,9 +61,9 @@ def trigger_save(labname, question=None, response=None, answer=""):
 
     if answer:
         answer = re.sub(r"[\"'`]", "", str(answer))
-    
+
     cmd_args = ["/home/USERNAME_GOES_HERE/.education/grader.py", LabInitial(labname).name]
-    
+
     if question is not None:
         cmd_args.append(str(question))
     if response is not None:
@@ -101,7 +125,7 @@ def stop_lab(labname, confirm, output):
         # Writing the information to an empty field below the button.
         with output:
             output.clear_output()
-            
+
             display(HTML(f"<span>Stopping the {labname} lab. This will take a minute to process. Please wait.</span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
             stopexp = subprocess.run(f'bash /home/stopexp {labname}jup', capture_output=True, text=True, shell=True)
@@ -152,7 +176,7 @@ def prepare_lab(labname, output0):
                 output0.clear_output()
                 display(HTML("<span style='color: red;'>Please create ~/pass.txt before clicking Start Lab. This file must contain your SPHERE password.</span>"))
                 return
-        
+
         # Sign in first.
         if not sign_in_student(output0):
             return
@@ -253,12 +277,20 @@ def prepare_lab(labname, output0):
                 check=True
             )
 
+            # Making sure that the lab was installed fine.
+            output0.clear_output()
+            display(HTML("<span>Verifying the integrity of the files...</span>"))
+            verify_install(labname)
+
             check_autosave(labname)
 
+            output0.clear_output()
             display(HTML(
                 "<br><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
                 "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
             ))
+
+
 
 #################
 # Debugging Tips:
