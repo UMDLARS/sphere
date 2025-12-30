@@ -32,7 +32,7 @@ def verify_install(labname):
     cmd = (
         "ssh -o StrictHostKeyChecking=no "
         "-i /home/USERNAME_GOES_HERE/.ssh/merge_key "
-        "USERNAME_GOES_HERE@intro "
+        f"USERNAME_GOES_HERE@{labname} "
         "test -d /home/.checker"
     )
 
