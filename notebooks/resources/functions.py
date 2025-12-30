@@ -73,25 +73,30 @@ def trigger_save(labname, question=None, response=None, answer=""):
 
     result = subprocess.run(cmd_args, capture_output=True, text=True)
 
-def load_notebook(labname):
-    with load_lock:
-        result = subprocess.run([
-            '/home/USERNAME_GOES_HERE/resources/load.py', labname
-        ], capture_output=True, text=True)
-        result_queue.put(result)
-
-def trigger_load(labname):
-    load_thread = threading.Thread(target=load_notebook, args=(labname,))
-    load_thread.start()
-    load_thread.join()
-    return result_queue.get()
-
 def warn_student(labname):
     warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
     return False
+
+def load_notebook(labname):
+    with load_lock:
+        result = subprocess.run([
+            '/home/USERNAME_GOES_HERE/resources/load.py', labname
+        ], capture_output=True, text=True)
+        result_queue.put(result)
+        
+    # Removes the warning after loading the lab.
+    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
+    if os.path.exists(warning_path):
+        os.remove(warning_path)
+
+def trigger_load(labname):
+    load_thread = threading.Thread(target=load_notebook, args=(labname,))
+    load_thread.start()
+    load_thread.join()
+    return result_queue.get()
 
 def sign_in_student(output0):
     with output0:
@@ -279,7 +284,7 @@ def prepare_lab(labname, output0):
 
             # Making sure that the lab was installed fine.
             output0.clear_output()
-            display(HTML("<span>Verifying the integrity of the files...</span>"))
+            display(HTML("<span>Verifying the integrity of the files...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
             verify_install(labname)
 
             check_autosave(labname)
