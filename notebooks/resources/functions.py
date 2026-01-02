@@ -39,7 +39,8 @@ def verify_install(labname):
     result = subprocess.run(cmd, shell=True)
 
     # If the directory doesn't exist, we re-run the command again.
-    if (result.returncode == 0):
+    if (result.returncode == 1):
+        print("Restarting...")
         subprocess.run(
             ['bash', '/home/runlab', f'{labname}jup'],
             stdout=subprocess.DEVNULL,
@@ -86,7 +87,7 @@ def load_notebook(labname):
             '/home/USERNAME_GOES_HERE/resources/load.py', labname
         ], capture_output=True, text=True)
         result_queue.put(result)
-        
+
     # Removes the warning after loading the lab.
     warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
@@ -272,8 +273,7 @@ def prepare_lab(labname, output0):
                         shell=True, check=True
                     )
 
-            display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span>"))
-            time.sleep(2)
+            display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span><span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
 
             subprocess.run(
                 ['bash', '/home/runlab', f'{labname}jup'],
@@ -282,9 +282,11 @@ def prepare_lab(labname, output0):
                 check=True
             )
 
+            time.sleep(2)
+
             # Making sure that the lab was installed fine.
             output0.clear_output()
-            display(HTML("<span>Verifying the integrity of the files...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
+            display(HTML("<span>Lab is installed. Verifying that the lab was configured properly...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
             verify_install(labname)
 
             check_autosave(labname)
