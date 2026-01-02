@@ -39,6 +39,7 @@ def verify_install(labname):
     result = subprocess.run(cmd, shell=True)
 
     # If the directory doesn't exist, we re-run the command again.
+    # Can implement a check to keep testing, but this should do for now.
     if (result.returncode == 1):
         print("Restarting...")
         subprocess.run(
@@ -48,7 +49,8 @@ def verify_install(labname):
             check=True
         )
 
-    # Can implement a check to keep testing, but this should do for now.
+        # Installing sometimes happens after the script has ended. Enforcing a short wait time.
+        time.sleep(5)
 
 def save_notebook(labname):
     with save_lock:
@@ -223,6 +225,9 @@ def prepare_lab(labname, output0):
                 check=True
             )
 
+            # Installing sometimes happens after the script has ended. Enforcing a short wait time.
+            time.sleep(5)
+
             output0.clear_output()
             display(HTML(
                 "<br><span style='color: green;'><strong>Your lab has been re-installed. </strong></span>"
@@ -275,14 +280,15 @@ def prepare_lab(labname, output0):
 
             display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span><span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
 
-            subprocess.run(
+            check = subprocess.run(
                 ['bash', '/home/runlab', f'{labname}jup'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 check=True
             )
 
-            time.sleep(2)
+            # Installing sometimes happens after the script has ended. Enforcing a short wait time.
+            time.sleep(5)
 
             # Making sure that the lab was installed fine.
             output0.clear_output()
