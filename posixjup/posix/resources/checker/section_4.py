@@ -215,6 +215,12 @@ def main():
 
     # Checks step 23: Adding write protection.
     elif step == "23":
+        # Before running this step, we need to make sure that misty exists.
+        try:
+            pwd.getpwnam('misty')
+        except KeyError:
+            sys.exit(4)
+
         # The project directory isn't accessible unless you're ash, misty, or brock. Need to use subprocesses for this part.
         # First, seeing if the text file exists.
         result = subprocess.run('sudo su - misty -c "test -f /collections/project/progress_report.txt"', shell=True)
