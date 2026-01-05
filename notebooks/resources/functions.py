@@ -207,10 +207,9 @@ def prepare_lab(labname, output0):
                     f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
                     shell=True, check=True
                 )
-            except Exception as e:
-                print(e)
-                # output0.clear_output()
-                # display(HTML("<span style='color: red;'>There was an error starting your experiment. Please navigate to the \"Activations\" tab on SPHERE and see if your lab has an error. This is likely due to SPHERE being unable to process a request. Contact your instructor/TA for support, or try again.</span>"))
+            except:
+                output0.clear_output()
+                display(HTML("<span style='color: red;'>There was an error starting your experiment. Please navigate to the \"Activations\" tab on SPHERE and see if your lab has an error. This is likely due to SPHERE being unable to process a request. Contact your instructor/TA for support, or try again.</span>"))
 
             display(HTML(
                 "<span>Re-running the installation... </span>"
