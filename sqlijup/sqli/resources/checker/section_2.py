@@ -23,7 +23,7 @@ def execute_query(query):
 
     except mysql.connector.Error as e:
         print(f"Error executing SQL query: {e}")
-        sys.exit(2)
+        sys.exit(4)
 
 def main():
     # Check to make sure that the function is called correctly.
