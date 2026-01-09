@@ -208,7 +208,7 @@ def prepare_lab(labname, output0):
                     shell=True, check=True
                 )
             except Exception as e:
-		print(e)
+                print(e)
                 # output0.clear_output()
                 # display(HTML("<span style='color: red;'>There was an error starting your experiment. Please navigate to the \"Activations\" tab on SPHERE and see if your lab has an error. This is likely due to SPHERE being unable to process a request. Contact your instructor/TA for support, or try again.</span>"))
 
@@ -216,6 +216,7 @@ def prepare_lab(labname, output0):
                 "<span>Re-running the installation... </span>"
                 "<span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
             ))
+
 
             check_autosave(labname)
 

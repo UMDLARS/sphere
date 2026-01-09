@@ -19,6 +19,7 @@ def installation():
         # Pulling install_notebooks. Need to invoke sudo for this.
         command = (
             'sudo curl -LJO https://raw.githubusercontent.com/UMDLARS/sphere/refs/heads/main/install_notebooks.sh '
+            '&& sudo mv install_notebooks.sh /home/install_notebooks.sh '
             '&& sudo chmod a+x /home/install_notebooks.sh'
         )
 
