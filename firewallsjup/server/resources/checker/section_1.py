@@ -33,8 +33,11 @@ def main():
         answer2 = answers[1].strip()
 
         # Check the two solutions.
-        if ((answer1 == "telnet localhost 80" or answer1 == "telnet 10.0.1.1 80") and answer2 == "GET /index.html"):
+        if ((answer1 == "telnet localhost 80" or answer1 == "telnet 10.0.1.1 80") and (answer2 == "GET /index.html" or answer2 == "GET /index.html HTTP/1.0")):
             sys.exit(0)
+
+        elif "HTTP" in answer2:
+            sys.exit(3)
 
         else:
             sys.exit(1)
