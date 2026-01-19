@@ -231,6 +231,10 @@ def main():
 
             if (result.stdout == b'1550\n'):
                 sys.exit(0)
+
+            elif(result.stdout == b'550\n'):
+                sys.exit(5)
+
             else:
                 sys.exit(1)
 
