@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import sys
+import shlex
 
 def main():
     # Checks usage.
@@ -33,11 +34,8 @@ def main():
         answer2 = answers[1].strip()
 
         # Check the two solutions.
-        if ((answer1 == "telnet localhost 80" or answer1 == "telnet 10.0.1.1 80") and (answer2 == "GET /index.html" or answer2 == "GET /index.html HTTP/1.0")):
+        if ((answer1 == "telnet localhost 80" or answer1 == "telnet 10.0.1.1 80") and answer2 == "GET /index.html"):
             sys.exit(0)
-
-        elif "HTTP" in answer2:
-            sys.exit(3)
 
         else:
             sys.exit(1)
@@ -46,17 +44,29 @@ def main():
     if (step == "4"):
         # Split the answers.
         answers = answer.split("\\n")
+        cmd = shlex.split(answers[0])
 
-        required_params = ["-l", "-p 10000"]
-
-        other_components_present = all(component in answers[0] for component in required_params)
-
-        # Check the two solutions.
-        if (answers[0].startswith("nc") and other_components_present and (answers[1] == "nc server 10000" or answers[1] == "nc 10.0.1.1 10000")):
-            sys.exit(0)
-
-        else:
+        # Must start with nc.
+        if cmd[0] != "nc":
             sys.exit(1)
 
+        # Valid flag patterns.
+        valid_forms = [
+            ["-l", "-p", "10000"],
+            ["-p", "10000", "-l"],
+            ["-lp", "10000"]
+        ]
+
+        # Remove 'nc'.
+        args = cmd[1:]
+
+        if args not in valid_forms:
+            sys.exit(1)
+
+        # Check second answer.
+        if answers[1] not in ("nc server 10000", "nc 10.0.1.1 10000"):
+            sys.exit(1)
+
+        sys.exit(0)
 
 main()
