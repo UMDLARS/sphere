@@ -102,6 +102,14 @@ def main():
 
     # Check Step 11.
     if (step == "11"):
+        # Making sure that Step 5 was complete before checking.
+        if (os.path.exists("/lab/memo.py")):
+            f = open("/lab/memo.py")
+            contents = f.read()
+            if "### Step 12 Solution START ###" not in contents:
+                f.close()
+                sys.exit(4)
+
         # Attempt to navigate to the URL that the student provided.
         result = subprocess.run("curl 127.0.0.1:5010/memo/" + payload, shell=True, capture_output=True, text=True)
 
