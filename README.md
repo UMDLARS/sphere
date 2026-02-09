@@ -224,4 +224,4 @@ These labs are distributed under the **[Creative Commons Attribution-NonCommerci
 
 ## Research 🔬
 
-These labs were designed to evaluate students' comprehension as part of a cybersecurity pedagogy thesis. A link to this thesis write-up will be available once it is published.
+These labs were designed to evaluate students' comprehension as part of a cybersecurity pedagogy thesis. [You may read about this study here](https://www.proquest.com/docview/3297300458/previewPDF/AAE3C1B5D4374839PQ/1?sourcetype=Dissertations%20&%20Theses).
