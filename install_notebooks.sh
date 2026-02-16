@@ -19,7 +19,7 @@ deb http://archive.ubuntu.com/ubuntu ${CODENAME} main restricted universe multiv
 deb http://archive.ubuntu.com/ubuntu ${CODENAME}-updates main restricted universe multiverse
 deb http://archive.ubuntu.com/ubuntu ${CODENAME}-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu ${CODENAME}-security main restricted universe multiverse
-EOF' 2>/dev/null
+EOF' >/dev/null 2>&1
 
 sudo apt-get -qq clean
 
@@ -109,6 +109,9 @@ done
 sudo mv runlab startexp stopexp runr /home
 sudo mv grader.py /home/$USER/.education
 sudo chmod a+x /home/runlab /home/startexp /home/stopexp /home/runr /home/$USER/.education/grader.py
+
+# Copying over a "functions" file that SPHERE uses. This fixes a timeout error that runr encounters.
+sudo cp /share/functions /home
 
 # Cleanup temporary directory.
 rm -rf "$TEMP_DIR"
