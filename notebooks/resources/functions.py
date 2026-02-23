@@ -305,6 +305,15 @@ def prepare_lab(labname, output0):
                 "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
             ))
 
+            # Extend the XDC's expiration by two weeks, following this lab being started.
+            try:
+                startexp = subprocess.run(
+                    ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
+                    capture_output=True, text=True, check=True
+                )
+            except subprocess.CalledProcessError as e:
+                display(HTML("<span style='color: orange;'>Warning: XDC expiration failed to extend by two weeks.</span>"))
+
 
 
 #################
