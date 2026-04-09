@@ -60,6 +60,10 @@ Below is a list of nouns that are used when discussing the SPHERE architecture. 
 
 To begin using these labs in your class, you must have access to the Merge CLI (command line interface). This is used to automate some scripts which will make registration easier for your students. You may download the CLI [here](https://gitlab.com/mergetb/portal/cli/-/releases). There are plenty of releases available.
 
+### Notice for Instructors
+
+We have a `sphere_instructors` repository that contains helpful scripts with grading, answer keys, new notebook generation, and setup. Please contact us below if you would like access to this repository.
+
 ### Preliminary Setup ⚙️
 
 First, identify your operating system. If you have one of the following operating systems, search for a release with these in the name:
