@@ -28,7 +28,7 @@ REPO_URL="https://github.com/UMDLARS/sphere"
 
 # Installing some dependencies.
 echo "Installing dependencies."
-sudo apt-get -qq update
+sudo apt-get -qq update 2>/dev/null
 sudo apt-get -qq install git rsync >/dev/null
 
 # sudo is required for these, since the notebooks are ran as root. Hiding the warning about installing packages as root.
