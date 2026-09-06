@@ -2,6 +2,6 @@ from mergexp import *
 
 net = Network('buffer', addressing==ipv4)
 
-nodes = [net.node(name, image == 'bullseye-edu') for name in [ 'buffer' ]]
+nodes = [net.node(name) for name in [ 'buffer' ]]
 
 experiment(net)

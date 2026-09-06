@@ -1,6 +1,6 @@
 from mergexp import *
 net = Network('xss', addressing==ipv4, routing==static)
-server,client,teshwan = [net.node(name, image == 'bullseye-edu') for name in [ 'server', 'client', 'teshwan' ]]
+server,client,teshwan = [net.node(name) for name in [ 'server', 'client', 'teshwan' ]]
 
 # Create a link connecting the two nodes.
 link = net.connect([server,client,teshwan])

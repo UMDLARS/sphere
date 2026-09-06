@@ -1,4 +1,4 @@
 from mergexp import *
 net = Network('intro', addressing==ipv4)
-nodes = [net.node(name, image == 'bullseye-edu') for name in [ 'intro' ]]
+nodes = [net.node(name) for name in [ 'intro' ]]
 experiment(net)

@@ -7,7 +7,7 @@ from mergexp import *
 net = Network('firewalls', addressing==ipv4, routing==static)
 
 # Creating the node.
-server,client = [net.node(name, image == 'bullseye-edu') for name in [ 'server', 'client' ]]
+server,client = [net.node(name) for name in [ 'server', 'client' ]]
 
 # Create a link connecting the two nodes.
 link = net.connect([server,client])
