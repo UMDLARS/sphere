@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 int main() {
-    const char *hidden_file = "/usr/share/discover/dtd/.findme.txt";
+    const char *hidden_file = "/usr/share/doc/zerofree/.findme.txt";
     if (access(hidden_file, F_OK) == 0) {
         return 1;
     }
