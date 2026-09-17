@@ -201,16 +201,24 @@ def prepare_lab(labname, output0):
                 "<span>You might have run another lab without stopping it. Attaching the existing activation...</span>"
             ))
 
-            try:
-                subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
-                subprocess.run(
-                    f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
-                    shell=True, check=True
-                )
-            except Exception as e:
-                print(e)
-                # output0.clear_output()
-                # display(HTML("<span style='color: red;'>There was an error starting your experiment. Please navigate to the \"Activations\" tab on SPHERE and see if your lab has an error. This is likely due to SPHERE being unable to process a request. Contact your instructor/TA for support, or try again.</span>"))
+            detach_result = subprocess.run(
+                'mrg xdc detach xdc.USERNAME_GOES_HERE',
+                shell=True, capture_output=True, text=True
+            )
+            
+            if detach_result.returncode != 0:
+                print(f"Note: XDC detach reported a non-zero exit ({detach_result.returncode}); continuing anyway.")
+                print(detach_result.stdout + detach_result.stderr)
+
+            attach_result = subprocess.run(
+                f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
+                shell=True, capture_output=True, text=True
+            )
+            
+            attach_output = attach_result.stdout + attach_result.stderr
+            if attach_result.returncode != 0 and "XDC not ready yet" not in attach_output:
+                print(f"Note: XDC attach reported a non-zero exit ({attach_result.returncode}); continuing anyway.")
+                print(attach_output)
 
             display(HTML(
                 "<span>Re-running the installation... </span>"
@@ -243,76 +251,79 @@ def prepare_lab(labname, output0):
                 "<span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"
             ))
 
-            try:
-                startexp = subprocess.run(
-                    ['bash', '/home/startexp', f'{labname}jup'],
-                    capture_output=True, text=True, check=True
-                )
-            except subprocess.CalledProcessError as e:
-                output0.clear_output()
-                display(HTML("<span style='color: red;'>There was an error starting your experiment.</span>"))
-                return
-
-            output0.clear_output()
-            output_html = startexp.stdout.strip()
-
-            display(HTML(
-                f"<span>Done. Result:</span>"
-                f"<div style='max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;'>"
-                f"<pre style='white-space: pre-wrap;'>{output_html}</pre></div>"
-            ))
-
-            if "XDC already attached" in startexp.stdout:
-                match = re.search(r"real\.(.*?)\.USERNAME_GOES_HERE", startexp.stdout)
-                existing_lab = match.group(1) if match else None
-
-                if existing_lab == labname:
-                    display(HTML("<span style='color: red;'>Your lab was already started. Please continue to the next step.</span>"))
-                elif existing_lab:
-                    display(HTML(
-                        f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span>"
-                        f"<span>Please stop your experiments before starting a new one. Detaching the <code>{existing_lab}</code> experiment.</span>"
-                    ))
-                    subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
-                    display(HTML("<span>Attaching the current lab.</span>"))
-                    subprocess.run(
-                        f'mrg xdc attach xdc {material_pattern}',
-                        shell=True, check=True
-                    )
-
-            display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span><span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-
-            check = subprocess.run(
-                ['bash', '/home/runlab', f'{labname}jup'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True
+        try:
+            startexp = subprocess.run(
+                ['bash', '/home/startexp', f'{labname}jup'],
+                capture_output=True, text=True, check=True
             )
-
-            # Installing sometimes happens after the script has ended. Enforcing a short wait time.
-            time.sleep(5)
-
-            # Making sure that the lab was installed fine.
+            # print("Output: " + startexp.stdout)
+            # print("Error: " + startexp.stderr)
+            
+        except subprocess.CalledProcessError as e:
             output0.clear_output()
-            display(HTML("<span>Lab is installed. Verifying that the lab was configured properly...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-            verify_install(labname)
+            display(HTML("<span style='color: red;'>There was an error starting your experiment.</span>"))
+            return
+            
+        output0.clear_output()
+        output_html = startexp.stdout.strip()
 
-            check_autosave(labname)
+        display(HTML(
+            f"<span>Done. Result:</span>"
+            f"<div style='max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;'>"
+            f"<pre style='white-space: pre-wrap;'>{output_html}</pre></div>"
+        ))
 
-            output0.clear_output()
-            display(HTML(
-                "<br><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
-                "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
-            ))
+        if "XDC already attached" in startexp.stdout:
+            match = re.search(r"real\.(.*?)\.USERNAME_GOES_HERE", startexp.stdout)
+            existing_lab = match.group(1) if match else None
 
-            # Extend the XDC's expiration by two weeks, following this lab being started.
-            try:
-                startexp = subprocess.run(
-                    ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
-                    capture_output=True, text=True, check=True
+            if existing_lab == labname:
+                display(HTML("<span style='color: red;'>Your lab was already started. Please continue to the next step.</span>"))
+            elif existing_lab:
+                display(HTML(
+                    f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span>"
+                    f"<span>Please stop your experiments before starting a new one. Detaching the <code>{existing_lab}</code> experiment.</span>"
+                ))
+                subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
+                display(HTML("<span>Attaching the current lab.</span>"))
+                subprocess.run(
+                    f'mrg xdc attach xdc {material_pattern}',
+                    shell=True, check=True
                 )
-            except subprocess.CalledProcessError as e:
-                display(HTML("<span style='color: orange;'>Warning: XDC expiration failed to extend by two weeks.</span>"))
+
+        display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span><span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
+
+        check = subprocess.run(
+            ['bash', '/home/runlab', f'{labname}jup'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+
+        # Installing sometimes happens after the script has ended. Enforcing a short wait time.
+        time.sleep(5)
+
+        # Making sure that the lab was installed fine.
+        output0.clear_output()
+        display(HTML("<span>Lab is installed. Verifying that the lab was configured properly...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
+        verify_install(labname)
+
+        check_autosave(labname)
+
+        output0.clear_output()
+        display(HTML(
+            "<br><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
+            "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
+        ))
+
+        # Extend the XDC's expiration by two weeks, following this lab being started.
+        try:
+            startexp = subprocess.run(
+                ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
+                capture_output=True, text=True, check=True
+            )
+        except subprocess.CalledProcessError as e:
+            display(HTML("<span style='color: orange;'>Warning: XDC expiration failed to extend by two weeks.</span>"))
 
 
 

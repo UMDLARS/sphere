@@ -1,15 +1,18 @@
 #!/usr/bin/bash
 
 function usage {
-    echo $(basename $0) [-n expname] [-o] [-p projname] [-s] labname
+    echo $(basename $0) [-n expname] [-o] [-p projname] [-P projname] [-f folder][-m modelfile][-s] labname
     echo -e "\t-n assign the given name to the experiment, instead of labname"
     echo -e "\t-o look for model in /organization folder"
     echo -e "\t-p create an experiment in the given project"
+    echo -e "\t-P look for model file in the given project"
+    echo -e "\t-f look for model file in the given folder"
+    echo -e "\t-m use specified model file"
     echo -e "\t-s set up nodes for the lab after the experiment is ready"
     return
 }
 
-OPTSTRING=":n:op:s"
+OPTSTRING=":n:op:P:f:m:s"
 
 # specify labname, assume password is stored in pass.txt file or $PASSWORD 
 if [ $# -lt 1 ] ; then
@@ -19,14 +22,14 @@ fi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-RETRIES=${RETRIES:-10}   # needed for runr
 
 user=$(whoami)
 proj=$user
 lab=${@: -1} 
 exp=$lab
 run=0
-labpath="/home/$USER/.education"
+labpath="/home/$user/.education"
+modelfile=$labpath/$lab/$lab.model
 org=""
 while getopts ${OPTSTRING} opt; do    
   case ${opt} in
@@ -36,13 +39,26 @@ while getopts ${OPTSTRING} opt; do
 	if [ $exp == $lab ] ; then
 	    exp=$lab$user
 	fi
+	modelfile=$labpath/$lab/$lab.model
 	;;
     n)
 	exp=${OPTARG}
 	;;
     p)
 	proj=${OPTARG}
-	;;    
+	;;
+    P)
+	Proj=${OPTARG}
+	labpath="/project/"$Proj
+	modelfile=$labpath/$lab/$lab.model
+	;;
+    f)
+	labpath=${OPTARG}
+	modelfile=$labpath/$lab/$lab.model
+ 	;;
+    m) 
+	modelfile=${OPTARG}
+	;;
     :)
 	echo "Option ${OPTARG} requires an argument"
 	usage
@@ -58,14 +74,17 @@ while getopts ${OPTSTRING} opt; do
 	;;
     esac
 done
-echo "Path $labpath lab $lab name $exp proj $proj";
+echo "Path $labpath lab $lab name $exp proj $proj modelfile $modelfile";
 
 PATH=$PATH:/share
 
 # load util functions
 . $SCRIPT_DIR/functions
-
-checklab $labpath $lab
+if [[ "$modelfile" == "/home/$user/.education"* ]]; then
+	checklab $labpath $lab
+else
+	checkmodel $modelfile
+fi
 DEBUG=${DEBUG:-0}
 RETRYSLEEP=3
 
@@ -75,7 +94,7 @@ if [[ $? -ne 0 ]]; then
     echo Installing jq utility
     sudo apt update 
     sudo apt install -y jq
-
+    
     type jq >&/dev/null 
     if [[ $? -ne 0 ]]; then
         echo Error installing jq.
@@ -97,7 +116,7 @@ fi
 mrg config set server grpc.sphere-testbed.net
 
 echo Logging $user into Merge
-runr mrg login $user -p $pass
+mrg login $user -p $pass
 if [[ $? -ne 0 ]]; then 
     echo Error logging in.
     exit 1
@@ -111,19 +130,11 @@ fi
 mrg show exp $exp.$proj &>/dev/null
 if [ $? -ne 0 ]; then 
     echo Creating experiment $exp.$proj
-    runr mrg new experiment $exp.$proj
+    mrg new experiment $exp.$proj
     if [[ $? -ne 0 ]]; then 
         echo Error creating new experiment.
         exit 1
     fi
-
-    # echo Pushing $lab model
-    # rev=`mrg push home/.education/$lab/$lab.model $exp.$proj | awk '{print $4}'`
-    # runr mrg show revision $exp.$proj $rev
-    # if [[ $? -ne 0 ]]; then 
-    #     echo Error compiling model.
-    #     exit 1
-    # fi
 fi
 
 # See if the realization exists. If so get the revision hash.
@@ -133,10 +144,10 @@ if [[ -z $rev ]]; then
 
     echo No existing realization found.
     sleep 60
-    echo Pushing new $lab model.
-    rev=$(mrg push $labpath/$lab/$lab.model $exp.$proj | head -1 | awk '{print $4}')
+    echo Pushing new model.
+    rev=$(mrg push $modelfile $exp.$proj | head -1 | awk '{print $4}')
     sleep 2
-    runr mrg show revision $exp.$proj $rev
+    mrg show revision $exp.$proj $rev
     if [[ $? -ne 0 ]]; then 
         echo Error compiling model.
         exit 1
@@ -152,7 +163,7 @@ mzid=real.$exp.$proj
 if [[ $isrlz -eq 0 ]]; then 
 
     echo Realizing model.
-    runr mrg realize $mzid revision $rev
+    mrg realize $mzid revision $rev
     if [[ $? -ne 0 ]]; then
         echo Error realizing the model. There may not be available testbed resources. Please check with your TA or professor. 
         exit 1
@@ -176,15 +187,44 @@ else
     echo Model is already realized.
 fi
 
+# Attempts to materialize the given mzid.
+materialize_mzid() {
+    local mzid=$1
+    local max_tries=3
+    local attempt=1
+    local out rc
+
+    while [[ $attempt -le $max_tries ]]; do
+        echo "Materializing $mzid (attempt $attempt of $max_tries)..."
+        out=$(mrg materialize $mzid 2>&1)
+        rc=$?
+        # filter cosmetic "jq: error ..." noise from the echoed output; 
+        # detection below still uses the full, unfiltered $out.
+        echo "$out" | grep -v "^jq: error"
+
+        # Clean success: zero exit code and no error text in the output.
+        if [[ $rc -eq 0 ]] && ! echo "$out" | grep -q "ERRO"; then
+            return 0
+        fi
+
+        echo "Materialize reported an error (attempt $attempt of $max_tries). Waiting 10 seconds before retrying..."
+        sleep 10
+        attempt=$(( attempt + 1 ))
+    done
+
+    echo "Error: Materialization of $mzid still reports an error after $max_tries attempts."
+    return 1
+}
+
 # See if the realization is materialized.
 remat=0  # is this a new mtz? If so we may need to reattach the XDC.
 mrg show materialization $mzid &>/dev/null
 if [[ $? -ne 0 ]]; then 
     echo Materializing model
 
-    runr mrg materialize $mzid
+    materialize_mzid $mzid
     if [[ $? -ne 0 ]]; then 
-        echo Error materializing the model. Please check with your TA or professor.
+        echo Error materializing the model. Please retry. If it fails more than twice, check with your TA or professor.
         # do we want to relinquish here? 
         exit 1
     fi
@@ -193,7 +233,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 # confirm materialization is there and ready.
-runr mrg show materialization $mzid
+mrg show materialization $mzid
 if [[ $? -ne 0 ]]; then
     echo Cannot confirm materialization is active.
     exit 1
@@ -217,21 +257,75 @@ if [[ $status != Success ]]; then
     echo Materialization was not successful. Status: $status
     echo Please contact your professor, TA, or Merge testbed OPs. 
     # may as well demtz?
-    runr mrg dematerialize $mzid
+    mrg dematerialize $mzid
     exit 1
 fi
+
+# Attempts to attach the given XDC to the given materialization.
+attach_xdc() {
+    local xdc=$1
+    local mzid=$2
+    local max_tries=3
+    local attempt=1
+    local out rc attached_val
+
+    while [[ $attempt -le $max_tries ]]; do
+        echo "Attaching XDC $xdc to $mzid (attempt $attempt of $max_tries)..."
+        out=$(mrg xdc attach $xdc $mzid 2>&1)
+        rc=$?
+
+        # filter cosmetic "jq: error ..." noise from the echoed output; 
+        # detection below still uses the full, unfiltered $out.
+        echo "$out" | grep -v "^jq: error"
+
+        # mrg reports the XDC isn't ready yet -- this means it's already
+        # attached to $mzid, so we're done.
+        if echo "$out" | grep -q "FailedPrecondition" && echo "$out" | grep -qi "XDC not ready yet"; then
+            echo "XDC $xdc is already attached to $mzid."
+            return 0
+        fi
+
+        # Clean success: zero exit code and no error text in the output.
+        if [[ $rc -eq 0 ]] && ! echo "$out" | grep -q "ERRO"; then
+            return 0
+        fi
+
+        # Otherwise the attach reported an error. Wait a few seconds and
+        # check whether the attachment actually went through anyway.
+        echo "Attach reported an error. Waiting 5 seconds to check actual attachment status..."
+        sleep 5
+
+        attached_val=$(mrg show xdc $xdc | tail -n +2 | awk '{print $3}')
+        if [[ "$attached_val" == "$mzid" ]]; then
+            echo "XDC $xdc is attached to $mzid."
+            return 0
+        fi
+
+        echo "XDC $xdc is not yet attached to $mzid (attempt $attempt of $max_tries)."
+        attempt=$(( attempt + 1 ))
+    done
+
+    echo "Error: Unable to confirm that XDC $xdc is attached to $mzid after $max_tries attempts."
+    return 1
+}
 
 # sleep here because sometimes if we try to attach too early it doesn't work
 sleep 60
 echo Checking XDC attachment...
-xdc=$(hostname -f | cut -d- -f1)
+#xdc=$(hostname | cut -d'.' -f1)
+#xdc="${xdc//-/.}"
+# this should work for both
+# xdc-usc430ejdv.xdc.sphere-testbed.net
+# xdc.usc430ejdv-7b7f5f8cff-fjxpm
+xdc=$(hostname | sed 's/\./-/g; s/\([^-]*-[^-]*\)-.*/\1/; s/-/./;')
+
 attached=$(mrg list xdc -j | jq -r --arg XDC $xdc '.XDCs[] | select(.name == $XDC).materialization')
 
-if [[ $attached == null ]]; then 
+if [[ $attached == null || $attached == "" ]] ; then 
     echo XDC is not attached. Attaching to $mzid 
-    runr mrg xdc attach $xdc $mzid
+    attach_xdc $xdc $mzid
     if [[ $? -ne 0 ]]; then 
-        echo Unable to attach XDC to $mzid 
+        echo Unable to attach XDC $xdc to $mzid 
         echo Please contact your professor, TA, or Merge testbed OPs. 
         exit 1
     fi
@@ -240,7 +334,7 @@ else
     if [[ $attached != $mzid || ($attached == $mzid && $remat -eq 1) ]]; then 
         # not attached to our mtz or a stale mtz
         echo Detaching XDC from $attached
-        runr mrg xdc detach $xdc
+        mrg xdc detach $xdc
         if [[ $? -ne 0 ]]; then 
             echo Unable to detach XDC. 
             echo Please contact your professor, TA, or Merge testbed OPs. 
@@ -251,7 +345,7 @@ else
 
         # ..and attach to our mtz.
         echo Attaching XDC to $mzid 
-        runr mrg xdc attach $xdc $mzid
+        attach_xdc $xdc $mzid
         if [[ $? -ne 0 ]]; then 
             echo Unable to attach XDC to $mzid 
             echo Please contact your professor, TA, or Merge testbed OPs. 
@@ -267,3 +361,10 @@ if [ $run -eq 1 ] ; then
     runlab $org $lab
 fi
 
+# Everything above either succeeded or exited 1 explicitly on failure, so if
+# we reach this point the run was successful. Exit 0 explicitly rather than
+# letting the script's exit code fall through to whatever the last internal
+# command happened to return (mrg can leave a stray nonzero status behind
+# from its own internal jq/status-rendering calls even on a successful
+# operation, e.g. the "XDC not ready yet" / already-attached case).
+exit 0

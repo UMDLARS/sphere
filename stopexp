@@ -45,7 +45,7 @@ while getopts ${OPTSTRING} opt; do
 done
 echo "Path $labpath lab $lab name $exp proj $proj";
 
-PATH=$PATH:/share
+PATH=$PATH:/home
 
 if [ -e $HOME/pass.txt ]; then
     pass=$(cat $HOME/pass.txt)
