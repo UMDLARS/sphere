@@ -40,8 +40,8 @@ chown -R $USER /home/.checker
 sudo -u $USER /home/.checker/run_inotify.sh
 
 # Create a hidden file for step 4.
-echo "You found me!" > /usr/share/discover/dtd/.findme.txt
-chown -R $USER /usr/share/discover/dtd/
+echo "You found me!" > /usr/share/doc/zerofree/.findme.txt
+chown -R $USER /usr/share/doc/zerofree/
 
 # Replacing a username placeholder for step2.py.
 sed -i "s/USERNAME_FOR_NODE/$USER/g" /home/.checker/step2.py
