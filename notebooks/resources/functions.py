@@ -7,6 +7,7 @@ import time
 from IPython.display import display, HTML
 from enum import Enum
 import shlex
+import html
 
 save_lock = threading.Lock()
 load_lock = threading.Lock()
@@ -25,37 +26,96 @@ class LabInitial(Enum):
     W = "worm"
     D = "dwarf"
 
-# This is going to be called whenever the lab has finished installing.
-# Fixes a possible race condition with SPHERE's runlab command.
-def verify_install(labname):
-    # Checking to see if the source files are added.
-    cmd = (
-        "ssh -o StrictHostKeyChecking=no "
-        "-i /home/USERNAME_GOES_HERE/.ssh/merge_key "
-        f"USERNAME_GOES_HERE@{labname} "
-        "test -d /home/.checker"
-    )
+# ---------------------------------------------------------------------------
+# Install verification
+# ---------------------------------------------------------------------------
+CHECKER_DIR = "/home/.checker"
+SSH_KEY = "/home/umdclassdoen/.ssh/merge_key"
 
-    result = subprocess.run(cmd, shell=True)
 
-    # If the directory doesn't exist, we re-run the command again.
-    # Can implement a check to keep testing, but this should do for now.
-    if (result.returncode == 1):
-        print("Restarting...")
-        subprocess.run(
+def _run_runlab(labname):
+    """Runs SPHERE's runlab script. Never raises; returns the CompletedProcess
+    (or a fake one with returncode -1 if the process could not run at all)."""
+    try:
+        return subprocess.run(
             ['bash', '/home/runlab', f'{labname}jup'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True
+            capture_output=True, text=True, timeout=600
         )
+    except subprocess.TimeoutExpired as e:
+        return subprocess.CompletedProcess(e.cmd, -1, stdout="", stderr="runlab timed out")
 
+
+def _checker_status(labname):
+    """
+    Checks the remote node for the .checker directory.
+
+    Returns (status, detail) where status is one of:
+      "present"     - directory exists (and is non-empty)
+      "missing"     - ssh worked, but the directory is not there (yet)
+      "unreachable" - ssh itself failed (bad host, auth, timeout, node not up yet...)
+    """
+    cmd = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",  # nodes get recreated; stale host keys shouldn't matter
+        "-o", "LogLevel=ERROR",
+        "-o", "BatchMode=yes",                 # never sit waiting on a password prompt
+        "-o", "ConnectTimeout=10",
+        "-i", SSH_KEY,
+        f"umdclassdoen@{labname}",
+        # Directory must exist AND contain something, so a half-finished copy doesn't pass.
+        f"test -d {CHECKER_DIR} && test -n \"$(ls -A {CHECKER_DIR})\"",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        return "unreachable", "ssh timed out"
+
+    detail = (result.stderr or "").strip()
+    if result.returncode == 0:
+        return "present", detail
+    # ssh reserves 255 for its OWN failures. `test` failing on the remote side returns 1.
+    if result.returncode == 255:
+        return "unreachable", detail or "ssh exited with 255"
+    return "missing", detail
+
+
+# This is going to be called whenever the lab has finished installing.
+# Fixes a possible race condition with SPHERE's runlab command: the install can
+# finish AFTER runlab returns, so we poll for the checker files instead of testing
+# once, and only re-run runlab if they still haven't shown up.
+#
+# Returns (True, "") on success, or (False, "<diagnostic detail>") on failure.
+def verify_install(labname, attempts=3, wait_timeout=45, poll_interval=5):
+    last_status, last_detail = "unknown", ""
+
+    for attempt in range(1, attempts + 1):
+        # Give the (possibly still-running) install time to land before judging it.
+        deadline = time.time() + wait_timeout
+        while True:
+            last_status, last_detail = _checker_status(labname)
+            if last_status == "present":
+                return True, ""
+            if time.time() >= deadline:
+                break
+            time.sleep(poll_interval)
+
+        if attempt == attempts:
+            break
+
+        print(f"Checker files not found ({last_status}). Restarting install "
+              f"(attempt {attempt + 1} of {attempts})...")
+        _run_runlab(labname)
         # Installing sometimes happens after the script has ended. Enforcing a short wait time.
         time.sleep(5)
+
+    return False, f"status={last_status}; {last_detail}"
+
 
 def save_notebook(labname):
     with save_lock:
         subprocess.run([
-            '/home/USERNAME_GOES_HERE/resources/save.py', labname
+            '/home/umdclassdoen/resources/save.py', labname
         ], capture_output=True, text=True)
 
 def trigger_save(labname, question=None, response=None, answer=""):
@@ -65,7 +125,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     if answer:
         answer = re.sub(r"[\"'`]", "", str(answer))
 
-    cmd_args = ["/home/USERNAME_GOES_HERE/.education/grader.py", LabInitial(labname).name]
+    cmd_args = ["/home/umdclassdoen/.education/grader.py", LabInitial(labname).name]
 
     if question is not None:
         cmd_args.append(str(question))
@@ -77,7 +137,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     result = subprocess.run(cmd_args, capture_output=True, text=True)
 
 def warn_student(labname):
-    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
+    warning_path = f"/home/umdclassdoen/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
@@ -86,12 +146,12 @@ def warn_student(labname):
 def load_notebook(labname):
     with load_lock:
         result = subprocess.run([
-            '/home/USERNAME_GOES_HERE/resources/load.py', labname
+            '/home/umdclassdoen/resources/load.py', labname
         ], capture_output=True, text=True)
         result_queue.put(result)
 
     # Removes the warning after loading the lab.
-    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
+    warning_path = f"/home/umdclassdoen/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
 
@@ -111,7 +171,7 @@ def sign_in_student(output0):
             stderr=subprocess.DEVNULL
         )
         subprocess.run(
-            ["mrg", "login", "USERNAME_GOES_HERE", "-p", open("/home/USERNAME_GOES_HERE/pass.txt").read().strip()],
+            ["mrg", "login", "umdclassdoen", "-p", open("/home/umdclassdoen/pass.txt").read().strip()],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -119,8 +179,8 @@ def sign_in_student(output0):
     return True
 
 def check_autosave(labname):
-    if os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz"):
-        subprocess.run(f"touch /home/USERNAME_GOES_HERE/saves/.{labname}_warning", shell=True)
+    if os.path.exists(f"/home/umdclassdoen/saves/umdclassdoen_{labname}.tar.gz"):
+        subprocess.run(f"touch /home/umdclassdoen/saves/.{labname}_warning", shell=True)
 
 def stop_lab(labname, confirm, output):
     # Check to make sure that the student wants to confirm ending the lab.
@@ -152,7 +212,7 @@ def load_lab(labname, output0_2):
         output0_2.clear_output()
         display(HTML("<span>Searching for an existing lab in your notebook...</span>"))
 
-    if (os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz")):
+    if (os.path.exists(f"/home/umdclassdoen/saves/umdclassdoen_{labname}.tar.gz")):
         with output0_2:
             output0_2.clear_output()
             display(HTML("<span>Loading your lab...</span> \
@@ -175,11 +235,11 @@ def load_lab(labname, output0_2):
 
 def prepare_lab(labname, output0):
     with output0:
-        os.chdir("/home/USERNAME_GOES_HERE")
+        os.chdir("/home/umdclassdoen")
         output0.clear_output()
 
         # Check if the student has the pass.txt file.
-        if (not os.path.exists("/home/USERNAME_GOES_HERE/pass.txt")):
+        if (not os.path.exists("/home/umdclassdoen/pass.txt")):
             with output0:
                 output0.clear_output()
                 display(HTML("<span style='color: red;'>Please create ~/pass.txt before clicking Start Lab. This file must contain your SPHERE password.</span>"))
@@ -189,7 +249,7 @@ def prepare_lab(labname, output0):
         if not sign_in_student(output0):
             return
 
-        material_pattern = f"real.{labname}jup.USERNAME_GOES_HERE"
+        material_pattern = f"real.{labname}jup.umdclassdoen"
         result = subprocess.run(
             ['mrg', 'list', 'materializations'],
             capture_output=True, text=True
@@ -202,7 +262,7 @@ def prepare_lab(labname, output0):
             ))
 
             detach_result = subprocess.run(
-                'mrg xdc detach xdc.USERNAME_GOES_HERE',
+                'mrg xdc detach xdc.umdclassdoen',
                 shell=True, capture_output=True, text=True
             )
             
@@ -211,7 +271,7 @@ def prepare_lab(labname, output0):
                 print(detach_result.stdout + detach_result.stderr)
 
             attach_result = subprocess.run(
-                f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
+                f'mrg xdc attach xdc.umdclassdoen {material_pattern}',
                 shell=True, capture_output=True, text=True
             )
             
@@ -274,7 +334,7 @@ def prepare_lab(labname, output0):
         ))
 
         if "XDC already attached" in startexp.stdout:
-            match = re.search(r"real\.(.*?)\.USERNAME_GOES_HERE", startexp.stdout)
+            match = re.search(r"real\.(.*?)\.umdclassdoen", startexp.stdout)
             existing_lab = match.group(1) if match else None
 
             if existing_lab == labname:
@@ -284,21 +344,25 @@ def prepare_lab(labname, output0):
                     f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span>"
                     f"<span>Please stop your experiments before starting a new one. Detaching the <code>{existing_lab}</code> experiment.</span>"
                 ))
-                subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
+                subprocess.run('mrg xdc detach xdc.umdclassdoen', shell=True, check=True)
                 display(HTML("<span>Attaching the current lab.</span>"))
                 subprocess.run(
-                    f'mrg xdc attach xdc {material_pattern}',
+                    f'mrg xdc attach xdc.umdclassdoen {material_pattern}',
                     shell=True, check=True
                 )
 
         display(HTML("<span>Allocating lab resources onto the node. <u>Please wait a little longer...</u></span><span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
 
-        check = subprocess.run(
-            ['bash', '/home/runlab', f'{labname}jup'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True
-        )
+        check = _run_runlab(labname)
+        if check.returncode != 0:
+            output0.clear_output()
+            display(HTML(
+                "<span style='color: red;'>The lab installation script failed. "
+                "Please click Start Lab again. If this keeps happening, contact your instructor.</span>"
+                f"<details><summary>Details</summary><pre style='white-space: pre-wrap;'>"
+                f"{html.escape((check.stderr or check.stdout or '').strip())}</pre></details>"
+            ))
+            return
 
         # Installing sometimes happens after the script has ended. Enforcing a short wait time.
         time.sleep(5)
@@ -306,11 +370,19 @@ def prepare_lab(labname, output0):
         # Making sure that the lab was installed fine.
         output0.clear_output()
         display(HTML("<span>Lab is installed. Verifying that the lab was configured properly...</span> <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-        verify_install(labname)
+        installed, detail = verify_install(labname)
+
+        output0.clear_output()
+        if not installed:
+            display(HTML(
+                "<span style='color: red;'><strong>Your lab started, but its files did not finish installing.</strong></span> "
+                "<span>Please click Start Lab again to retry. If this keeps happening, contact your instructor.</span>"
+                f"<details><summary>Details</summary><pre style='white-space: pre-wrap;'>{html.escape(detail)}</pre></details>"
+            ))
+            return
 
         check_autosave(labname)
 
-        output0.clear_output()
         display(HTML(
             "<br><span style='color: green;'><strong>Setup complete. You may begin the lab! </strong></span>"
             "<span>When you're finished, close your lab at the bottom of the notebook. Your lab will be active for one week.</span>"
@@ -319,7 +391,7 @@ def prepare_lab(labname, output0):
         # Extend the XDC's expiration by two weeks, following this lab being started.
         try:
             startexp = subprocess.run(
-                ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
+                ['mrg', 'xdc', 'update', 'expiration', 'xdc.umdclassdoen', '2w'],
                 capture_output=True, text=True, check=True
             )
         except subprocess.CalledProcessError as e:

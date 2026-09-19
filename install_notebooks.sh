@@ -106,6 +106,8 @@ done
 [ -f /tmp/"${USER}_logs.txt" ] && mv /tmp/"${USER}_logs.txt" $EDUCATION
 
 # Finally, copy all of the notebook function files (should be four of them) into the student's XDC.
+# Need to replace the placeholder username for one of the files.
+sed -i "s|USERNAME_GOES_HERE|$USER|g" runlab
 sudo mv runlab startexp stopexp runr /home
 sudo mv grader.py /home/$USER/.education
 sudo chmod a+x /home/runlab /home/startexp /home/stopexp /home/runr /home/$USER/.education/grader.py
