@@ -35,7 +35,7 @@ if [ -d "${TMP}/collections/" ]; then
 fi
 
 # Checking if other users have been made and move them if they exist.
-for user in ash brock misty james; do
+for user in ash brock misty arthur; do
     if [ -d "${TMP}/home/$user" ]; then
         sudo rm -rf "/home/$user"
         sudo mv "${TMP}/home/$user" "/home/"

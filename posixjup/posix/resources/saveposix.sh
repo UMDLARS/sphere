@@ -19,7 +19,7 @@ sudo tar -cvpzf ${USER}_posix.tar.gz \
     /home/ash/ \
     /home/brock/ \
     /home/misty/ \
-    /home/james/ \
+    /home/arthur/ \
     /home/.checker/responses \
     /etc/passwd \
     /etc/group \

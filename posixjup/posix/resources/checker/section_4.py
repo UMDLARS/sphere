@@ -77,7 +77,7 @@ def main():
 
     # Checks step 13: Creating the users.
     if step == "13":
-        users = ["ash", "misty", "brock", "james"]
+        users = ["ash", "misty", "brock", "arthur"]
         if all(check_user_exists(user) for user in users):
             sys.exit(0)
         else:
@@ -94,7 +94,7 @@ def main():
     elif step == "15":
         users = ["ash", "misty", "brock"]
         if all(check_user_in_group(user, "trainers") for user in users):
-            if (check_user_in_group("james", "trainers")):
+            if (check_user_in_group("arthur", "trainers")):
                 sys.exit(3)
 
             else:
