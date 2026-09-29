@@ -30,7 +30,7 @@ class LabInitial(Enum):
 # Install verification
 # ---------------------------------------------------------------------------
 CHECKER_DIR = "/home/.checker"
-SSH_KEY = "/home/umdclassdoen/.ssh/merge_key"
+SSH_KEY = "/home/USERNAME_GOES_HERE/.ssh/merge_key"
 
 
 def _run_runlab(labname):
@@ -62,7 +62,7 @@ def _checker_status(labname):
         "-o", "BatchMode=yes",                 # never sit waiting on a password prompt
         "-o", "ConnectTimeout=10",
         "-i", SSH_KEY,
-        f"umdclassdoen@{labname}",
+        f"USERNAME_GOES_HERE@{labname}",
         # Directory must exist AND contain something, so a half-finished copy doesn't pass.
         f"test -d {CHECKER_DIR} && test -n \"$(ls -A {CHECKER_DIR})\"",
     ]
@@ -115,7 +115,7 @@ def verify_install(labname, attempts=3, wait_timeout=45, poll_interval=5):
 def save_notebook(labname):
     with save_lock:
         subprocess.run([
-            '/home/umdclassdoen/resources/save.py', labname
+            '/home/USERNAME_GOES_HERE/resources/save.py', labname
         ], capture_output=True, text=True)
 
 def trigger_save(labname, question=None, response=None, answer=""):
@@ -125,7 +125,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     if answer:
         answer = re.sub(r"[\"'`]", "", str(answer))
 
-    cmd_args = ["/home/umdclassdoen/.education/grader.py", LabInitial(labname).name]
+    cmd_args = ["/home/USERNAME_GOES_HERE/.education/grader.py", LabInitial(labname).name]
 
     if question is not None:
         cmd_args.append(str(question))
@@ -137,7 +137,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     result = subprocess.run(cmd_args, capture_output=True, text=True)
 
 def warn_student(labname):
-    warning_path = f"/home/umdclassdoen/saves/.{labname}_warning"
+    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
         return True
@@ -146,12 +146,12 @@ def warn_student(labname):
 def load_notebook(labname):
     with load_lock:
         result = subprocess.run([
-            '/home/umdclassdoen/resources/load.py', labname
+            '/home/USERNAME_GOES_HERE/resources/load.py', labname
         ], capture_output=True, text=True)
         result_queue.put(result)
 
     # Removes the warning after loading the lab.
-    warning_path = f"/home/umdclassdoen/saves/.{labname}_warning"
+    warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
     if os.path.exists(warning_path):
         os.remove(warning_path)
 
@@ -171,7 +171,7 @@ def sign_in_student(output0):
             stderr=subprocess.DEVNULL
         )
         subprocess.run(
-            ["mrg", "login", "umdclassdoen", "-p", open("/home/umdclassdoen/pass.txt").read().strip()],
+            ["mrg", "login", "USERNAME_GOES_HERE", "-p", open("/home/USERNAME_GOES_HERE/pass.txt").read().strip()],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -179,8 +179,8 @@ def sign_in_student(output0):
     return True
 
 def check_autosave(labname):
-    if os.path.exists(f"/home/umdclassdoen/saves/umdclassdoen_{labname}.tar.gz"):
-        subprocess.run(f"touch /home/umdclassdoen/saves/.{labname}_warning", shell=True)
+    if os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz"):
+        subprocess.run(f"touch /home/USERNAME_GOES_HERE/saves/.{labname}_warning", shell=True)
 
 def stop_lab(labname, confirm, output):
     # Check to make sure that the student wants to confirm ending the lab.
@@ -212,7 +212,7 @@ def load_lab(labname, output0_2):
         output0_2.clear_output()
         display(HTML("<span>Searching for an existing lab in your notebook...</span>"))
 
-    if (os.path.exists(f"/home/umdclassdoen/saves/umdclassdoen_{labname}.tar.gz")):
+    if (os.path.exists(f"/home/USERNAME_GOES_HERE/saves/USERNAME_GOES_HERE_{labname}.tar.gz")):
         with output0_2:
             output0_2.clear_output()
             display(HTML("<span>Loading your lab...</span> \
@@ -235,11 +235,11 @@ def load_lab(labname, output0_2):
 
 def prepare_lab(labname, output0):
     with output0:
-        os.chdir("/home/umdclassdoen")
+        os.chdir("/home/USERNAME_GOES_HERE")
         output0.clear_output()
 
         # Check if the student has the pass.txt file.
-        if (not os.path.exists("/home/umdclassdoen/pass.txt")):
+        if (not os.path.exists("/home/USERNAME_GOES_HERE/pass.txt")):
             with output0:
                 output0.clear_output()
                 display(HTML("<span style='color: red;'>Please create ~/pass.txt before clicking Start Lab. This file must contain your SPHERE password.</span>"))
@@ -249,7 +249,7 @@ def prepare_lab(labname, output0):
         if not sign_in_student(output0):
             return
 
-        material_pattern = f"real.{labname}jup.umdclassdoen"
+        material_pattern = f"real.{labname}jup.USERNAME_GOES_HERE"
         result = subprocess.run(
             ['mrg', 'list', 'materializations'],
             capture_output=True, text=True
@@ -262,7 +262,7 @@ def prepare_lab(labname, output0):
             ))
 
             detach_result = subprocess.run(
-                'mrg xdc detach xdc.umdclassdoen',
+                'mrg xdc detach xdc.USERNAME_GOES_HERE',
                 shell=True, capture_output=True, text=True
             )
             
@@ -271,7 +271,7 @@ def prepare_lab(labname, output0):
                 print(detach_result.stdout + detach_result.stderr)
 
             attach_result = subprocess.run(
-                f'mrg xdc attach xdc.umdclassdoen {material_pattern}',
+                f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
                 shell=True, capture_output=True, text=True
             )
             
@@ -334,7 +334,7 @@ def prepare_lab(labname, output0):
         ))
 
         if "XDC already attached" in startexp.stdout:
-            match = re.search(r"real\.(.*?)\.umdclassdoen", startexp.stdout)
+            match = re.search(r"real\.(.*?)\.USERNAME_GOES_HERE", startexp.stdout)
             existing_lab = match.group(1) if match else None
 
             if existing_lab == labname:
@@ -344,10 +344,10 @@ def prepare_lab(labname, output0):
                     f"<span style='color: orange;'>Warning: You did not stop your previous experiment. </span>"
                     f"<span>Please stop your experiments before starting a new one. Detaching the <code>{existing_lab}</code> experiment.</span>"
                 ))
-                subprocess.run('mrg xdc detach xdc.umdclassdoen', shell=True, check=True)
+                subprocess.run('mrg xdc detach xdc.USERNAME_GOES_HERE', shell=True, check=True)
                 display(HTML("<span>Attaching the current lab.</span>"))
                 subprocess.run(
-                    f'mrg xdc attach xdc.umdclassdoen {material_pattern}',
+                    f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
                     shell=True, check=True
                 )
 
@@ -391,7 +391,7 @@ def prepare_lab(labname, output0):
         # Extend the XDC's expiration by two weeks, following this lab being started.
         try:
             startexp = subprocess.run(
-                ['mrg', 'xdc', 'update', 'expiration', 'xdc.umdclassdoen', '2w'],
+                ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
                 capture_output=True, text=True, check=True
             )
         except subprocess.CalledProcessError as e:
