@@ -34,8 +34,6 @@ SSH_KEY = "/home/USERNAME_GOES_HERE/.ssh/merge_key"
 
 
 def _run_runlab(labname):
-    """Runs SPHERE's runlab script. Never raises; returns the CompletedProcess
-    (or a fake one with returncode -1 if the process could not run at all)."""
     try:
         return subprocess.run(
             ['bash', '/home/runlab', f'{labname}jup'],
@@ -46,24 +44,15 @@ def _run_runlab(labname):
 
 
 def _checker_status(labname):
-    """
-    Checks the remote node for the .checker directory.
-
-    Returns (status, detail) where status is one of:
-      "present"     - directory exists (and is non-empty)
-      "missing"     - ssh worked, but the directory is not there (yet)
-      "unreachable" - ssh itself failed (bad host, auth, timeout, node not up yet...)
-    """
     cmd = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",  # nodes get recreated; stale host keys shouldn't matter
+        "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR",
-        "-o", "BatchMode=yes",                 # never sit waiting on a password prompt
+        "-o", "BatchMode=yes",
         "-o", "ConnectTimeout=10",
         "-i", SSH_KEY,
         f"USERNAME_GOES_HERE@{labname}",
-        # Directory must exist AND contain something, so a half-finished copy doesn't pass.
         f"test -d {CHECKER_DIR} && test -n \"$(ls -A {CHECKER_DIR})\"",
     ]
     try:
@@ -71,21 +60,20 @@ def _checker_status(labname):
     except subprocess.TimeoutExpired:
         return "unreachable", "ssh timed out"
 
+    print(result)
+
     detail = (result.stderr or "").strip()
     if result.returncode == 0:
         return "present", detail
-    # ssh reserves 255 for its OWN failures. `test` failing on the remote side returns 1.
     if result.returncode == 255:
         return "unreachable", detail or "ssh exited with 255"
     return "missing", detail
 
 
 # This is going to be called whenever the lab has finished installing.
-# Fixes a possible race condition with SPHERE's runlab command: the install can
-# finish AFTER runlab returns, so we poll for the checker files instead of testing
-# once, and only re-run runlab if they still haven't shown up.
-#
-# Returns (True, "") on success, or (False, "<diagnostic detail>") on failure.
+# Fixes a possible race condition with SPHERE's runlab command. The install can
+# finish AFTER runlab returns, so we poll for the checker files instead of 
+# testing once, and only re-run runlab if they still haven't shown up.
 def verify_install(labname, attempts=3, wait_timeout=45, poll_interval=5):
     last_status, last_detail = "unknown", ""
 
@@ -316,12 +304,17 @@ def prepare_lab(labname, output0):
                 ['bash', '/home/startexp', f'{labname}jup'],
                 capture_output=True, text=True, check=True
             )
-            # print("Output: " + startexp.stdout)
-            # print("Error: " + startexp.stderr)
-            
+        
         except subprocess.CalledProcessError as e:
             output0.clear_output()
-            display(HTML("<span style='color: red;'>There was an error starting your experiment.</span>"))
+            combined = (e.stdout or "") + (e.stderr or "")
+        
+            if "The provided credentials are invalid" in combined:
+                msg = "Unable to authenticate into SPHERE. Please ensure that your password in <code>~/pass.txt</code> is correct."
+            else:
+                msg = "There was an error starting your experiment."
+        
+            display(HTML(f"<span style='color: red;'>{msg}</span>"))
             return
             
         output0.clear_output()
