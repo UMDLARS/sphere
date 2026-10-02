@@ -42,7 +42,7 @@ def main():
     step = sys.argv[1]
 
     # We need the student's username throughout this entire lab.
-    username = "USERNAME_FOR_NODE"
+    username = "USERNAME_GOES_HERE"
 
     vulnerable = "/home/" + username + "/topic_2/step_" + str(int(step) - 4) + ".c"
     fix = "/home/" + username + "/topic_3/step_" + step + ".c"
@@ -99,28 +99,34 @@ def main():
         # Delete the temporary file.
         os.remove(temp_path + "step_" + step + "_temp")
 
-        # Check to see if it succeeded.
-        if (result.returncode == 0):
-            # It succeeded. Now, we are going to copy the student's next payload into topic_3/.
-            # If it's Step 16, the last step, create the Wormwood section if it's not created yet.
-            if (step != "16"):
-                src = "/home/" + username + "/topic_2/step_" + str(int(step) - 3) + ".c"
-                dest = "/home/" + username + "/topic_3/step_" + str(int(step) + 1) + ".c"
+        # The patched file still crashes (segfault, stack smashing detected, abort, etc.).
+        # Any non-zero return code means the patch did not actually fix the problem.
+        if (result.returncode != 0):
+            sys.exit(5)
 
-                if (step != "16" and not os.path.exists(dest)):
-                    subprocess.run("cp " + src + " " + dest, shell=True)
+        # It succeeded. Now, we are going to copy the student's next payload into topic_3/.
+        # If it's Step 16, the last step, create the Wormwood section if it's not created yet.
+        if (step != "16"):
+            src = "/home/" + username + "/topic_2/step_" + str(int(step) - 3) + ".c"
+            dest = "/home/" + username + "/topic_3/step_" + str(int(step) + 1) + ".c"
 
-            # If the step is passed, but it's Step 16, we need to set up Wormwood.
-            else:
-                # Dependencies should've already been installed. Begin cloning.
-                if (not os.path.exists("/home/" + username + "/topic_4/")):
-                    subprocess.run('/home/.checker/create_topic_4.sh', shell=True)
+            if (not os.path.exists(dest)):
+                subprocess.run("cp " + src + " " + dest, shell=True)
 
-            sys.exit(0)
+        # If the step is passed, but it's Step 16, we need to set up Wormwood.
+        else:
+            # Dependencies should've already been installed. Begin cloning.
+            if (not os.path.exists("/home/" + username + "/topic_4/")):
+                subprocess.run('/home/.checker/create_topic_4.sh', shell=True)
+
+        sys.exit(0)
 
     # Otherwise, the student vulnerable file doesn't pass the step. Should only happen if they changed their
     # original file.
     else:
         sys.exit(5)
+
+    # Should never be reached. Fail closed rather than defaulting to exit code 0.
+    sys.exit(5)
 
 main()

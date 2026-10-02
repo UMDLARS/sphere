@@ -121,7 +121,7 @@ int main() {
         print(result.returncode)
 
         # Segmentation fault should occur.
-        if (result.returncode == 139):
+        if (result.returncode == 134 or result.returncode == 139):
             # Create the next file for the student.
             if (not os.path.exists(pathname + "/step_" + str(int(step) + 1) + ".c") and step != "12"):
                 # Remove leading whitespace and extra newline.
