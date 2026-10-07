@@ -5,26 +5,43 @@ export RESOURCES="/tmp/sqli/resources"
 export CHECKER="/home/.checker"
 
 # The username is required for this lab.
-export USER=USERNAME_GOES_HERE
+export USER=umdclasscdxx
+
+# Avoid interactive prompts during apt installs.
+export DEBIAN_FRONTEND=noninteractive
 
 # Installing the required libraries.
 apt-get update
-apt-get install gcc python3-pip apache2 apache2-bin mariadb-server mariadb-client php7.4 libapache2-mod-php7.4 php7.4-cli php7.4-mysql libmariadb-dev -y
+apt-get install -y gcc apache2 apache2-bin mariadb-server mariadb-client \
+    php libapache2-mod-php php-cli php-mysql libmariadb-dev
 
-# Additionally, downloaded a couple pip libraries for the checker scripts.
-python3 -m pip install --upgrade pip
-pip install mysql-connector-python requests
+# Python libraries for the checker scripts.
+if ! apt-get install -y python3-mysql.connector python3-requests; then
+    echo "apt packages not available; falling back to pip."
+    apt-get install -y python3-pip
+    python3 -m pip install --break-system-packages mysql-connector-python requests
+fi
+
+# Make sure the database server is running before we use it later.
+start_service() {
+    if [ -d /run/systemd/system ]; then
+        systemctl start "$1" || true
+    else
+        service "$1" start || true
+    fi
+}
+start_service mariadb
 
 # Moving the checker scripts over.
-mkdir $CHECKER
-chown $USER $CHECKER 
-cp $RESOURCES/checker/* $CHECKER
+mkdir -p "$CHECKER"
+chown "$USER" "$CHECKER"
+cp "$RESOURCES"/checker/* "$CHECKER"
 
 # Moving the save/load scripts.
-cp $RESOURCES/*sqli.sh $CHECKER
+cp "$RESOURCES"/*sqli.sh "$CHECKER"
 
 # Moving into the /home/.checker directory.
-pushd $CHECKER/
+pushd "$CHECKER"
 
 # Compiling the .c files.
 gcc -o check_sql check_sql.c
@@ -32,14 +49,15 @@ gcc -o check_sql check_sql.c
 # Removing the .c files so that it's just binaries.
 rm -f check_sql.c
 
-# Return to the /tmp directory.
+# Return to the previous directory.
 popd
 
 # Now, go into the /tmp/sqli/resources/web_files directory.
-cd $RESOURCES/web_files
+cd "$RESOURCES/web_files" || exit 1
 
 ### Installing FCCU.php.
-cp index.html php_practice.php /var/www/html
+mkdir -p /var/www/html /usr/lib/cgi-bin
+cp index.html php_practice.php /var/www/html/
 cp FCCU.php /usr/lib/cgi-bin/
 
 # Creating a copy of FCCU.php in the tmp directory. In case students want to reset their file.
@@ -47,14 +65,14 @@ cp FCCU.php /usr/lib/cgi-bin/
 cp FCCU.php /tmp
 
 # Giving ownership to the student for php_practice.php and FCCU.php.
-chown $USER /var/www/html/php_practice.php
-chown $USER /usr/lib/cgi-bin/FCCU.php
+chown "$USER" /var/www/html/php_practice.php
+chown "$USER" /usr/lib/cgi-bin/FCCU.php
 
 # Create the responses directory.
-mkdir /home/.checker/responses
+mkdir -p "$CHECKER/responses"
 
 # Giving ownership to the students so that the checker will work.
-chown -R $USER $CHECKER
+chown -R "$USER" "$CHECKER"
 
 # Remove the password for root so that the checker will work.
 mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '';"
@@ -62,15 +80,24 @@ mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '';"
 # Creating the FCCU database.
 mysql < fccu.sql
 
-# Need to restart Apache, but first, turn errors on so that students will not get stuck.
-sed -i 's/display_errors = Off/display_errors = On/' /etc/php/7.4/apache2/php.ini
+# Turn PHP errors on so that students will not get stuck.
+# The glob avoids hardcoding the PHP version in the path.
+for ini in /etc/php/*/apache2/php.ini; do
+    [ -f "$ini" ] && sed -i 's/^display_errors = Off/display_errors = On/' "$ini"
+done
 
 # Required for getting the cgi-bin URL to work.
 a2enmod cgi
-systemctl restart apache2
+
+# Restart Apache (falls back to `service` if systemd isn't running, e.g. in a container).
+if [ -d /run/systemd/system ]; then
+    systemctl restart apache2
+else
+    service apache2 restart
+fi
 
 # Make the responses directory writeable so that the wire_log.txt file can be made.
-chmod o+w /home/.checker/responses
+chmod o+w "$CHECKER/responses"
 
 # Clean up.
-rm -rf *
+rm -rf ./*
