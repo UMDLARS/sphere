@@ -42,7 +42,7 @@ def main():
     step = sys.argv[1]
 
     # We need the student's username throughout this entire lab.
-    username = "USERNAME_GOES_HERE"
+    username = "USERNAME_FOR_NODE"
 
     vulnerable = "/home/" + username + "/topic_2/step_" + str(int(step) - 4) + ".c"
     fix = "/home/" + username + "/topic_3/step_" + step + ".c"

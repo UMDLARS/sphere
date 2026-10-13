@@ -83,7 +83,7 @@ def main():
         sys.exit(2)
 
     step = sys.argv[1]
-    username = "USERNAME_GOES_HERE"
+    username = "USERNAME_FOR_NODE"
 
     # Before running this step, check to make sure that the topic has been started.
     if (not os.path.exists(f"/home/{username}/topic_4")):
