@@ -5,12 +5,32 @@ export BASE="/tmp"
 export THISLAB="$BASE/$LAB"
 pushd $THISLAB
 
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
 
-DEBIAN_FRONTEND=noninteractive apt-get install libcurl3-dev apache2 php7.4 php7.4-dev libapache2-mod-php7.4 php7.4-cli php7.4-curl php-http -y
+# Version-less PHP packages follow whatever PHP this Ubuntu release ships.
+# (libcurl3-dev no longer exists; libcurl4-openssl-dev replaces it.)
+apt-get install -y libcurl4-openssl-dev apache2 php php-dev libapache2-mod-php php-cli php-curl
 
-touch /etc/php/7.4/mods-available/http.ini
-echo "extension=http.so" >> /etc/php/7.4/mods-available/http.ini
-/etc/init.d/apache2 restart
+# Kept separate so a missing php-http can't abort the core install above.
+if ! apt-get install -y php-http; then
+    echo "WARNING: php-http is not available on this release. The PECL http extension is NOT installed."
+fi
+
+# Detect the installed PHP version instead of hardcoding it.
+PHPV=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+
+# The php-http package normally ships and enables its own http.ini.
+# Only create one by hand if the package didn't, and only if http.so actually exists.
+if [ ! -f /etc/php/$PHPV/mods-available/http.ini ]; then
+    if find /usr/lib/php -name http.so 2>/dev/null | grep -q .; then
+        echo "extension=http.so" > /etc/php/$PHPV/mods-available/http.ini
+    fi
+fi
+if [ -f /etc/php/$PHPV/mods-available/http.ini ]; then
+    phpenmod http
+fi
+
+systemctl restart apache2
 
 cp $THISLAB/resources/steal.php /var/www/html/steal.php

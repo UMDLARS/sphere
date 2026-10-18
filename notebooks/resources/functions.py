@@ -13,6 +13,7 @@ save_lock = threading.Lock()
 load_lock = threading.Lock()
 result_queue = queue.Queue()
 
+### ADD NEW LABS HERE!
 class LabInitial(Enum):
     I = "intro"
     PO = "posix"
@@ -26,6 +27,14 @@ class LabInitial(Enum):
     W = "worm"
     D = "dwarf"
 
+# Labs listed here use their own name as the node name.
+# If you add a new lab, whose main node is not the name of the lab, define the
+# name of that node here! (i.e.: XSS uses a "server" node, not "xss").
+CHECKER_NODE_OVERRIDES = {
+    "xss": "server",
+    "firewalls": "server"
+}
+
 # ---------------------------------------------------------------------------
 # Install verification
 # ---------------------------------------------------------------------------
@@ -37,13 +46,15 @@ def _run_runlab(labname):
     try:
         return subprocess.run(
             ['bash', '/home/runlab', f'{labname}jup'],
-            capture_output=True, text=True, timeout=600
+            capture_output=True, encoding='utf-8', errors='replace', timeout=600
         )
     except subprocess.TimeoutExpired as e:
         return subprocess.CompletedProcess(e.cmd, -1, stdout="", stderr="runlab timed out")
 
 
 def _checker_status(labname):
+    node = CHECKER_NODE_OVERRIDES.get(labname, labname)
+
     cmd = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
@@ -52,11 +63,11 @@ def _checker_status(labname):
         "-o", "BatchMode=yes",
         "-o", "ConnectTimeout=10",
         "-i", SSH_KEY,
-        f"USERNAME_GOES_HERE@{labname}",
+        f"USERNAME_GOES_HERE@{node}",
         f"test -d {CHECKER_DIR} && test -n \"$(ls -A {CHECKER_DIR})\"",
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=30)
     except subprocess.TimeoutExpired:
         return "unreachable", "ssh timed out"
 
@@ -104,7 +115,7 @@ def save_notebook(labname):
     with save_lock:
         subprocess.run([
             '/home/USERNAME_GOES_HERE/resources/save.py', labname
-        ], capture_output=True, text=True)
+        ], capture_output=True, encoding='utf-8', errors='replace')
 
 def trigger_save(labname, question=None, response=None, answer=""):
     save_thread = threading.Thread(target=save_notebook, args=(labname,))
@@ -122,7 +133,7 @@ def trigger_save(labname, question=None, response=None, answer=""):
     if answer:
         cmd_args.append(answer)
 
-    result = subprocess.run(cmd_args, capture_output=True, text=True)
+    result = subprocess.run(cmd_args, capture_output=True, encoding='utf-8', errors='replace')
 
 def warn_student(labname):
     warning_path = f"/home/USERNAME_GOES_HERE/saves/.{labname}_warning"
@@ -135,7 +146,7 @@ def load_notebook(labname):
     with load_lock:
         result = subprocess.run([
             '/home/USERNAME_GOES_HERE/resources/load.py', labname
-        ], capture_output=True, text=True)
+        ], capture_output=True, encoding='utf-8', errors='replace')
         result_queue.put(result)
 
     # Removes the warning after loading the lab.
@@ -184,7 +195,7 @@ def stop_lab(labname, confirm, output):
 
             display(HTML(f"<span>Stopping the {labname} lab. This will take a minute to process. Please wait.</span> \
                 <span><img width='12px' height='12px' style='margin-left: 3px;' src='resources/loading.gif'></span>"))
-            stopexp = subprocess.run(f'bash /home/stopexp {labname}jup', capture_output=True, text=True, shell=True)
+            stopexp = subprocess.run(f'bash /home/stopexp {labname}jup', capture_output=True, encoding='utf-8', errors='replace', shell=True)
             output.clear_output()
             if ("Error deleting the experiment" in stopexp.stdout):
                 output.clear_output()
@@ -240,7 +251,7 @@ def prepare_lab(labname, output0):
         material_pattern = f"real.{labname}jup.USERNAME_GOES_HERE"
         result = subprocess.run(
             ['mrg', 'list', 'materializations'],
-            capture_output=True, text=True
+            capture_output=True, encoding='utf-8', errors='replace'
         )
 
         if re.search(material_pattern, result.stdout):
@@ -251,7 +262,7 @@ def prepare_lab(labname, output0):
 
             detach_result = subprocess.run(
                 'mrg xdc detach xdc.USERNAME_GOES_HERE',
-                shell=True, capture_output=True, text=True
+                shell=True, capture_output=True, encoding='utf-8', errors='replace'
             )
             
             if detach_result.returncode != 0:
@@ -260,7 +271,7 @@ def prepare_lab(labname, output0):
 
             attach_result = subprocess.run(
                 f'mrg xdc attach xdc.USERNAME_GOES_HERE {material_pattern}',
-                shell=True, capture_output=True, text=True
+                shell=True, capture_output=True, encoding='utf-8', errors='replace'
             )
             
             attach_output = attach_result.stdout + attach_result.stderr
@@ -302,7 +313,7 @@ def prepare_lab(labname, output0):
         try:
             startexp = subprocess.run(
                 ['bash', '/home/startexp', f'{labname}jup'],
-                capture_output=True, text=True, check=True
+                capture_output=True, encoding='utf-8', errors='replace', check=True
             )
         
         except subprocess.CalledProcessError as e:
@@ -385,7 +396,7 @@ def prepare_lab(labname, output0):
         try:
             startexp = subprocess.run(
                 ['mrg', 'xdc', 'update', 'expiration', 'xdc.USERNAME_GOES_HERE', '2w'],
-                capture_output=True, text=True, check=True
+                capture_output=True, encoding='utf-8', errors='replace', check=True
             )
         except subprocess.CalledProcessError as e:
             display(HTML("<span style='color: orange;'>Warning: XDC expiration failed to extend by two weeks.</span>"))
@@ -398,7 +409,7 @@ def prepare_lab(labname, output0):
 
 """
 Use something like this if you are trying to debug something within this script.
-result = subprocess.run(f'bash /home/runlab {labname}jup', capture_output=True, text=True, shell=True)
+result = subprocess.run(f'bash /home/runlab {labname}jup', capture_output=True, encoding='utf-8', errors='replace', shell=True)
 with output0:
     output0.append_stdout(f"Return code: {result.returncode}\n")
     output0.append_stdout(f"STDOUT:\n{result.stdout}\n")

@@ -15,11 +15,28 @@ export NVM_INSTALL_SCRIPT="/home/.checker/install_nvm.sh"
 cd /tmp/server
 
 # Install the required libraries.
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y mariadb-server mariadb-client apache2 libcurl3-dev php7.4 php7.4-dev php7.4-http php7.4-mysql php7.4-curl libapache2-mod-php7.4 php7.4-cli libcurl3-dev python3-pip wget xdg-utils libgbm1 libxshmfence1 libnss3 libcups2 libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0
 
-# Additionally, download a couple pip libraries for the checker scripts.
-pip install mysql-connector-python requests
+apt-get install -y mariadb-server mariadb-client apache2 \
+    php php-dev php-mysql php-curl php-cli libapache2-mod-php \
+    libcurl4-openssl-dev python3-pip python3-requests python3-mysql.connector \
+    wget xdg-utils
+
+# Optional PECL http extension. May not exist on newer releases, so don't abort if it's missing.
+apt-get install -y php-http || echo "WARNING: php-http not available (check whether the lab needs it)"
+
+# Browser/Puppeteer libraries. libasound2 became libasound2t64 on newer Ubuntu.
+apt-get install -y libgbm1 libxshmfence1 libnss3 libcups2 libxrandr2 libatk1.0-0 \
+    libatk-bridge2.0-0 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0
+apt-get install -y libasound2t64 || apt-get install -y libasound2
+
+# Detect the installed PHP version instead of hardcoding it.
+PHPV=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+export PHPV
+
+# Python deps for the checker scripts were installed from apt above (python3-requests,
+# python3-mysql.connector) because plain `pip install` is blocked by PEP 668 on newer Ubuntu.
 
 # Move the checker scripts over.
 mkdir -p $CHECKER
@@ -50,9 +67,14 @@ chmod a+w /home/.checker/responses
 mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '';"
 
 # Show PHP errors on the screen.
-sed -i 's/display_errors = Off/display_errors = On/' /etc/php/7.4/apache2/php.ini
+sed -i 's/display_errors = Off/display_errors = On/' /etc/php/$PHPV/apache2/php.ini
+
+# PCRE JIT needs writable+executable memory, which this VM's security settings refuse.
+# Without this, sanitize.php prints "Allocation of JIT memory failed" on every page load.
+echo "pcre.jit=0" > /etc/php/$PHPV/apache2/conf.d/99-pcre-jit.ini
 
 # Reset apache2 to reflect changes.
+systemctl enable --now mariadb
 systemctl restart apache2
 
 # Now, navigate into the web_files folder to distribute everything properly.

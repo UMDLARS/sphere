@@ -12,10 +12,24 @@ const fs = require('fs').promises;
 const victim_url = "http://10.0.1.1/xss_practice.php?auth=XXX";
 const umdsec_url = "http://10.0.1.1/xss_practice.php?auth=XXX";
 
+// Kept at module scope so that it can always be closed, even if run() throws.
+let browser;
+
+// Closes the browser, then exits. Without this, process.exit() leaves a headless
+// Chrome process running on the server after every student attempt.
+async function finish(code) {
+    try { await browser.close(); } catch (e) { /* already closed */ }
+    process.exit(code);
+}
+
 // This is the "main" function that gets called.
 async function run(step) {
-    // Create a browser and a page.
-    const browser = await puppeteer.launch();
+    // Create a browser and a page. The sandbox is disabled because Ubuntu 23.10+ blocks the
+    // user namespaces that Chrome's sandbox needs, which makes puppeteer.launch() fail for
+    // normal users. This browser only visits the lab's own pages on a throwaway VM.
+    browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
 
     // If this is Step 2, add a page.on handler, which prints the console.log information.
@@ -49,7 +63,7 @@ async function run(step) {
                 return "Error";
             }
         } catch (error) {
-            // console.log("Error accessing " + url + ": " + error.message);
+            console.error("Error accessing " + url + ": " + error.message);
             return "Error";
         }
     }
@@ -90,17 +104,17 @@ async function run(step) {
 
         catch (e) {
             console.log("File write error: " + e);
-            process.exit(2)
+            await finish(2);
         }
 
         // In case the student is running this step without the "keep work" boolean, then the rest
         // of the check can easily be made here. Just compare the two strings, then return a value.
         if (content1 !== content3) {
-            process.exit(0);
+            await finish(0);
         }
 
         else {
-            process.exit(1);
+            await finish(1);
         }
     }
 
@@ -120,7 +134,7 @@ async function run(step) {
 
         catch (e) {
             console.log("File write error: " + e);
-            process.exit(2)
+            await finish(2);
         }
 
         // Like Step 3, in case the student is running this step without the "keep work"
@@ -129,15 +143,15 @@ async function run(step) {
         if (content1 !== content3) {
             // Now, check to see if content3 has the victim's URL in it.
             if (content3.includes(victim_url)) {
-                process.exit(0);
+                await finish(0);
             }
 
-            // Otherwise, exit with 0.
-                process.exit(1);
+            // Otherwise, exit with 1.
+            await finish(1);
         }
 
         else {
-            process.exit(1);
+            await finish(1);
         }
     }
 
@@ -155,7 +169,7 @@ if ((process.argv).length != 3) {
 const step = parseInt(process.argv[2], 10);
 
 // Run the "run" command above.
-run(step).catch(err => {
-//    console.error(err);
-    process.exit(2);
+run(step).catch(async err => {
+    console.error(err);
+    await finish(2);
 });

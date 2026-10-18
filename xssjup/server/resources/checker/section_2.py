@@ -40,8 +40,9 @@ def main():
             # Run the section_2.js file. Saves the response from the payload.
             result = subprocess.run(f"{node_executable} /home/.checker/section_2.js 2", shell=True, capture_output=True, text=True)
 
-            # Check to see if there was an error.
-            if (result.stderr != ""):
+            # Check to see if there was an error. A non-zero exit code from section_2.js
+            # (for example, the browser failing to launch) is an error too, not a failed check.
+            if (result.returncode != 0 or result.stderr != ""):
                 sys.exit(2)
 
             # Otherwise, get the output and check it.
@@ -71,7 +72,7 @@ def main():
             # If we get matches, see if they print the result of 2*31, as the instructions state.
             for code in matches:
                 # Before checking, strip all whitespaces so that the regex will be cleaner.
-                stripped_code = re.sub('\s+', '', code)
+                stripped_code = re.sub('\\s+', '', code)
                 if (re.search(r"(?<=console\.log\()((2\*31)|(31\*2))(?=\))", stripped_code)):
                     # There's a match! Exit successfully.
                     sys.exit(0)
@@ -114,7 +115,7 @@ def main():
                 # If this was Step 4, then we need to do one more check.
                 elif (step == "4"):
                     # Check if the second response contains the URL of the victim.
-                    if ("http://10.0.1.1/xss_practice.php?auth=XXX" in responses[1]):
+                    if ("http://10.0.1.1/xss_practice.php?auth=TSATtX2ZLqcBfi3qbG7d7knDomApvaEJ" in responses[1]):
                         sys.exit(0)
 
                     else:
