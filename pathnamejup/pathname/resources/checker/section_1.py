@@ -145,7 +145,10 @@ def main():
                 f.write(curl_result.stdout)
     
             # Now call the C code to finalize Step 3. sudo is required here since we need to make a directory in /.
-            c_result = subprocess.run(["sudo", "-E", "/home/.checker/section_1", "3"], env=env, capture_output=True)
+            c_result = subprocess.run(
+                ["sudo", "env", f"CHECKER_SECRET={SECRET_VALUE}", "/home/.checker/section_1", "3"],
+                capture_output=True
+            )
 
             # Should work.
             if c_result.returncode == 0:

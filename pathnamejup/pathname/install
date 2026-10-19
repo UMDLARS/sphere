@@ -5,7 +5,7 @@ export RESOURCES="/tmp/pathname/resources"
 export CHECKER="/home/.checker"
 
 # The username is required for this lab.
-export USER=umdclasscdxx
+export USER=USERNAME_GOES_HERE
 
 # Installing the required libraries.
 # Note: "python" and "pip" are not valid package names on newer Ubuntu releases,
