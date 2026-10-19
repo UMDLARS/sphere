@@ -5,28 +5,29 @@ export RESOURCES="/tmp/pathname/resources"
 export CHECKER="/home/.checker"
 
 # The username is required for this lab.
-export USER=USERNAME_GOES_HERE
+export USER=umdclasscdxx
 
 # Installing the required libraries.
+# Note: "python" and "pip" are not valid package names on newer Ubuntu releases,
+# and apt aborts the entire install if any one package is missing.
+# python3-flask is installed through apt because pip refuses system-wide
+# installs on newer Ubuntu (externally-managed-environment).
 apt-get update
-apt-get install python pip python3-pip gcc -y
-pip install flask
+apt-get install -y python3 python3-flask gcc
 
 # Moving the checker scripts over.
-mkdir $CHECKER
+mkdir -p $CHECKER
 cp $RESOURCES/checker/* $CHECKER
 
 # Create the responses directory.
-mkdir /home/.checker/responses
+mkdir -p /home/.checker/responses
 
 # Moving into the /home/.checker directory.
 pushd $CHECKER/
 
-# Compiling the .c file.
-gcc -o section_1 section_1.c
-
-# Removing the .c file so that it's just binaries.
-rm -f section_1.c
+# Compiling the .c file, and removing the source only if the compile succeeds,
+# so that it's just binaries.
+gcc -o section_1 section_1.c && rm -f section_1.c
 
 # Return to the /tmp directory.
 popd
