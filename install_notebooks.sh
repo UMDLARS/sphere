@@ -57,6 +57,11 @@ fi
 # Saving the student's logs.
 [ -f "$EDUCATION/${USER}_logs.txt" ] && mv "$EDUCATION/${USER}_logs.txt" /tmp
 
+# Save the home directory's own mode and ownership. rsync -a would otherwise copy the
+# attributes of the cloned notebooks/ directory onto the home directory itself.
+HOME_MODE=$(stat -c '%a' "$LABS")
+HOME_OWNER=$(stat -c '%U:%G' "$LABS")
+
 # Excluding the following files:
 ## saves/ so that students don't lose progress.
 ## pass.txt so that students don't lose their configuration.
@@ -69,6 +74,10 @@ sudo rsync -a --delete \
   --exclude='.*' \
   --exclude='.*/' \
   notebooks/ ~ >/dev/null
+
+# Restore the home directory's original mode and ownership.
+sudo chmod "$HOME_MODE" "$LABS"
+sudo chown "$HOME_OWNER" "$LABS"
 
 # Ensure 'saves/' exists.
 mkdir -p $LABS/saves
