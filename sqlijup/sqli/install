@@ -5,7 +5,7 @@ export RESOURCES="/tmp/sqli/resources"
 export CHECKER="/home/.checker"
 
 # The username is required for this lab.
-export USER=USERNAME_GOES_HERE
+export USER=umdclasscdxx
 
 # Avoid interactive prompts during apt installs.
 export DEBIAN_FRONTEND=noninteractive
@@ -88,6 +88,18 @@ done
 
 # Required for getting the cgi-bin URL to work.
 a2enmod cgi
+
+# Apache's systemd unit sets ProtectHome=read-only, which makes /home read-only
+# for FCCU.php. Carve out the responses directory so wire_logs.txt can be written.
+# (The leading "-" tells systemd to ignore the path if it doesn't exist.)
+if [ -d /run/systemd/system ]; then
+    mkdir -p /etc/systemd/system/apache2.service.d
+    cat > /etc/systemd/system/apache2.service.d/fccu-wirelogs.conf <<EOF
+[Service]
+ReadWritePaths=-$CHECKER/responses
+EOF
+    systemctl daemon-reload
+fi
 
 # Restart Apache (falls back to `service` if systemd isn't running, e.g. in a container).
 if [ -d /run/systemd/system ]; then
