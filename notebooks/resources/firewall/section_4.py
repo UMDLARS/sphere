@@ -50,16 +50,15 @@ def main():
 
         # Checks for Steps 14 and 15.
         if (step == "14" or step == "15"):
-            if ("Connected to server" in answers[1]):
+            if ("Connected to server" in answers[1] or "Connection refused" in answers[1]):
                 sys.exit(1)
         
-            # Otherwise, successful.
             elif (answers[1].endswith("Trying 10.0.1.1...\n")):
                 sys.exit(0)
                 
-            # Not sure if this will happen, but if it does, return unsuccessful.
+            # Shouldn't reach since this "answers" file doesn't exist if it was incorrect.
             else:
-                sys.exit(2)
+                sys.exit(1)
 
         # Checks for Step 16.
         elif (step == "16"):
@@ -192,6 +191,10 @@ def main():
             # Some checks for Steps 14 and 15.
             if (step == "14" or step == "15"):
                 if ("Connected to server" in stdout):
+                    sys.exit(1)
+
+                # Connection was refused (rule didn't DROP the traffic -- wrong port direction).
+                elif ("Connection refused" in stdout):
                     sys.exit(1)
         
                 # Otherwise, successful. We can write the output as a response.
