@@ -29,7 +29,10 @@ def main():
     # Check Step 10.
     if (step == "10"):
         # Need a regular expression for checking this step.
-        if (answer == "-o eth1 -A OUTPUT" or answer == "-A OUTPUT -o eth1"):
+        # This is checking if the answer is of the form '-A OUTPUT -o {eth1, ens3f0}' or
+        # '-o {eth1, ens3f0} -A OUTPUT'
+        # (I'm pretty sure this is longer than just including the whole list of possiblities lol)
+        if (answer in [fmt for inf in ['eth1', 'ens3f0'] for fmt in [f"-o {inf} -A OUTPUT", f"-A OUTPUT -o {inf}"]]):
             # Correct answer. Save the response so that other steps can refer to it.
             f = open("/home/.checker/responses/step_10_answer.txt", "w+")
             f.write(answer)

@@ -20,7 +20,7 @@ def main():
 
     # Check Step 2.
     if (step == "2"):
-        if (answer == "eth1"):
+        if (answer in ["eth1", "ens3f0"]):
             sys.exit(0)
         else:
             sys.exit(1)
