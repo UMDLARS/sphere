@@ -5,7 +5,7 @@ export RESOURCES="/tmp/sqli/resources"
 export CHECKER="/home/.checker"
 
 # The username is required for this lab.
-export USER=umdclasscdxx
+export USER=USERNAME_GOES_HERE
 
 # Avoid interactive prompts during apt installs.
 export DEBIAN_FRONTEND=noninteractive
