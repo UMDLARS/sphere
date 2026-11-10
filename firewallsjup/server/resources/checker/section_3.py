@@ -85,36 +85,24 @@ def main():
         # Convert the set to a sorted list for consistency
         ips = sorted(ips)
 
-        # All potential IPs that the student can use are now in an array. Check to see if any of them
-        # are used in the students answer.
-        for ip in ips:
-            # Student is using a valid IP for Google. Now, use a regular expression to check the rest of
-            # the student's answer.
-            if (ip in answer):
-                pattern = (
-                    r"(?=.*-s\s+10\.0\.1\.1)"
-                    r"(?=.*-d\s+" + re.escape(ip) + r")"
-                    r"(?=.*--dport\s+1234)"
-                )
+        # Use a regular expression to check if the student's answer is formatted correctly.
+        pattern = (
+            r"(?=.*-s\s+10\.0\.1\.1)"
+            r"(?=.*-d\s+" + re.escape(ip) + r")"
+            r"(?=.*--dport\s+1234)"
+        )
+        if not re.search(pattern, answer):
+            sys.exit(1)
 
-                # Student has all three, required parameters for the step. IP address likely matches the one
-                # pulled from the dig command.
-                if (re.search(pattern, answer)):
-                    # Everything matches. Save and end successfully.
-                    f = open("/home/.checker/responses/step_12_answer.txt", "w")
-                    f.write(answer)
-                    f.close()
-
-                    sys.exit(0)
-
-        # The IP for Google cannot be found in their answer.
-        else:
+        # Check if the IP is in the list of google IPs.
+        if ip not in ips:
             sys.exit(3)
 
+        # Everything matches. Save and end successfully.
+        with open("/home/.checker/responses/step_12_answer.txt", "w") as fp:
+            f.write(answer)
 
-        # If the student reaches here, there was never a complete match. Likely due to the incorrect IP
-        # address, or not everything was constructed properly.
-        sys.exit(1)
+        sys.exit(0)
 
 
     # Check Step 13.
