@@ -172,8 +172,9 @@ def main():
     elif (step == "18"):
         # Gets the user input. Using regular expressions to check the answer here.
         pattern = r"^(?:[^%]*%(?:s|d|x|p)){7}[^%]*%(s)(?:[^%]*%(?:s|d|x|p))*[^%]*$"
+        pattern2 = r"^(?:[^%]*%(?:s|d|x|p)){9}[^%]*%(s)(?:[^%]*%(?:s|d|x|p))*[^%]*$"
 
-        if (re.search(pattern, payload)):
+        if (re.search(pattern, payload) or re.search(pattern2, payload)):
             sys.exit(0)
 
         else:
