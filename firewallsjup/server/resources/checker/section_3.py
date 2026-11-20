@@ -57,11 +57,11 @@ def main():
 
     # Check Step 12.
     if (step == "12"):
-        # NOTE: Google's IP address changes depending on which server that gets pinged.
+        # NOTE: Google's IP address changes depending on which server gets pinged.
         # To allow this step to work over the world, get some "wildcard" IP addresses.
         ips = set()
 
-        # Use dig to get all A records for google.com
+        # Use dig to get all A records for google.com.
         try:
             dig_result = subprocess.run(
                 ["dig", "google.com", "+short", "A"],
@@ -69,41 +69,40 @@ def main():
                 text=True,
                 check=True
             )
-            dig_ips = dig_result.stdout.strip().splitlines()
-            ips.update(dig_ips)
-        except subprocess.CalledProcessError as e:
+            ips.update(dig_result.stdout.strip().splitlines())
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"Error executing dig: {e}")
 
-        # Additionally, use socket to get all IP addresses
+        # Additionally, use socket to get IP addresses.
         try:
-            addr_info = socket.getaddrinfo("google.com", None)
-            socket_ips = {item[4][0] for item in addr_info if item[0] in (socket.AF_INET, socket.AF_INET6)}
-            ips.update(socket_ips)
+            addr_info = socket.getaddrinfo("google.com", None, socket.AF_INET)
+            ips.update(item[4][0] for item in addr_info)
         except socket.gaierror as e:
             print(f"Error resolving hostname: {e}")
 
-        # Optionally, remove any IPv6 addresses if you only need IPv4
-        ips = {ip for ip in ips if '.' in ip}  # Keeps only IPv4 addresses
+        # Keep only IPv4 addresses.
+        ips = {ip for ip in ips if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", ip)}
 
-        # Convert the set to a sorted list for consistency
-        ips = sorted(ips)
-
-        # Use a regular expression to check if the student's answer is formatted correctly.
+        # Check the format of the answer and capture the destination IP.
+        # The lookaheads allow the options to appear in any order.
         pattern = (
-            r"(?=.*-s\s+10\.0\.1\.1)"
-            r"(?=.*-d\s+" + re.escape(ip) + r")"
-            r"(?=.*--dport\s+1234)"
+            r"^(?=.*-s\s+10\.0\.1\.1(?:\s|$))"
+            r"(?=.*-d\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3})(?:\s|$))"
+            r"(?=.*--dport\s+1234(?:\s|$))"
         )
-        if not re.search(pattern, answer):
+        match = re.search(pattern, answer)
+        if not match:
             sys.exit(1)
 
-        # Check if the IP is in the list of google IPs.
-        if ip not in ips:
+        student_ip = match.group("ip")
+
+        # Check if the student's IP is one of Google's IPs.
+        if student_ip not in ips:
             sys.exit(3)
 
         # Everything matches. Save and end successfully.
         with open("/home/.checker/responses/step_12_answer.txt", "w") as fp:
-            f.write(answer)
+            fp.write(answer)
 
         sys.exit(0)
 
