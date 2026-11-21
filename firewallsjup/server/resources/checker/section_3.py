@@ -29,7 +29,10 @@ def main():
     # Check Step 10.
     if (step == "10"):
         # Need a regular expression for checking this step.
-        if (answer == "-o eth1 -A OUTPUT" or answer == "-A OUTPUT -o eth1"):
+        # This is checking if the answer is of the form '-A OUTPUT -o {eth1, ens3f0}' or
+        # '-o {eth1, ens3f0} -A OUTPUT'
+        # (I'm pretty sure this is longer than just including the whole list of possiblities lol)
+        if (answer in [fmt for inf in ['eth1', 'ens3f0'] for fmt in [f"-o {inf} -A OUTPUT", f"-A OUTPUT -o {inf}"]]):
             # Correct answer. Save the response so that other steps can refer to it.
             f = open("/home/.checker/responses/step_10_answer.txt", "w+")
             f.write(answer)
@@ -54,11 +57,11 @@ def main():
 
     # Check Step 12.
     if (step == "12"):
-        # NOTE: Google's IP address changes depending on which server that gets pinged.
+        # NOTE: Google's IP address changes depending on which server gets pinged.
         # To allow this step to work over the world, get some "wildcard" IP addresses.
         ips = set()
 
-        # Use dig to get all A records for google.com
+        # Use dig to get all A records for google.com.
         try:
             dig_result = subprocess.run(
                 ["dig", "google.com", "+short", "A"],
@@ -66,55 +69,42 @@ def main():
                 text=True,
                 check=True
             )
-            dig_ips = dig_result.stdout.strip().splitlines()
-            ips.update(dig_ips)
-        except subprocess.CalledProcessError as e:
+            ips.update(dig_result.stdout.strip().splitlines())
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"Error executing dig: {e}")
 
-        # Additionally, use socket to get all IP addresses
+        # Additionally, use socket to get IP addresses.
         try:
-            addr_info = socket.getaddrinfo("google.com", None)
-            socket_ips = {item[4][0] for item in addr_info if item[0] in (socket.AF_INET, socket.AF_INET6)}
-            ips.update(socket_ips)
+            addr_info = socket.getaddrinfo("google.com", None, socket.AF_INET)
+            ips.update(item[4][0] for item in addr_info)
         except socket.gaierror as e:
             print(f"Error resolving hostname: {e}")
 
-        # Optionally, remove any IPv6 addresses if you only need IPv4
-        ips = {ip for ip in ips if '.' in ip}  # Keeps only IPv4 addresses
+        # Keep only IPv4 addresses.
+        ips = {ip for ip in ips if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", ip)}
 
-        # Convert the set to a sorted list for consistency
-        ips = sorted(ips)
+        # Check the format of the answer and capture the destination IP.
+        # The lookaheads allow the options to appear in any order.
+        pattern = (
+            r"^(?=.*-s\s+10\.0\.1\.1(?:\s|$))"
+            r"(?=.*-d\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3})(?:\s|$))"
+            r"(?=.*--dport\s+1234(?:\s|$))"
+        )
+        match = re.search(pattern, answer)
+        if not match:
+            sys.exit(1)
 
-        # All potential IPs that the student can use are now in an array. Check to see if any of them
-        # are used in the students answer.
-        for ip in ips:
-            # Student is using a valid IP for Google. Now, use a regular expression to check the rest of
-            # the student's answer.
-            if (ip in answer):
-                pattern = (
-                    r"(?=.*-s\s+10\.0\.1\.1)"
-                    r"(?=.*-d\s+" + re.escape(ip) + r")"
-                    r"(?=.*--dport\s+1234)"
-                )
+        student_ip = match.group("ip")
 
-                # Student has all three, required parameters for the step. IP address likely matches the one
-                # pulled from the dig command.
-                if (re.search(pattern, answer)):
-                    # Everything matches. Save and end successfully.
-                    f = open("/home/.checker/responses/step_12_answer.txt", "w")
-                    f.write(answer)
-                    f.close()
-
-                    sys.exit(0)
-
-        # The IP for Google cannot be found in their answer.
-        else:
+        # Check if the student's IP is one of Google's IPs.
+        if student_ip not in ips:
             sys.exit(3)
 
+        # Everything matches. Save and end successfully.
+        with open("/home/.checker/responses/step_12_answer.txt", "w") as fp:
+            fp.write(answer)
 
-        # If the student reaches here, there was never a complete match. Likely due to the incorrect IP
-        # address, or not everything was constructed properly.
-        sys.exit(1)
+        sys.exit(0)
 
 
     # Check Step 13.
