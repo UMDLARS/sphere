@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# this installer is used for alice
+
+echo "Installing alice"
+
+ILOG="/var/log/labinstall.log"
+echo "Starting alice installer..." &>> $ILOG
+
+# if DEBUG = 1, won't lockout, won't unmount share
+# and will KEEP the labinstall logs.
+DEBUG=0
+KEEPLOG=0
+
+# set up pathnames
+export LAB="alice" # name of this lab
+export SOURCE="ExerciseCommon_UCLA" # common files
+
+export BASE="/tmp" # source root
+export THISLAB="$BASE/$LAB" # lab directory
+export DOWNLOADS="$THISLAB/$SOURCE"
+
+# support software
+export INSTALL_UCLA="$DOWNLOADS/scripts"
+
+# load the helper functions
+export FUNCTIONS="$INSTALL_UCLA/functions"
+source $FUNCTIONS
+echo "Loaded helper functions"
+
+# lock out incoming users during customization
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	NoLogin
+fi
+
+# cd into the lab directory
+pushd $THISLAB
+
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install apache2 elinks links wget netcat nmap curl net-tools psmisc -y &>> $ILOG
+
+# turn off mod_deflate since it makes ettercap's job tougher
+sudo a2dismod -f deflate
+sudo /etc/init.d/apache2 restart &>> $ILOG
+
+# Students shouldn't be able to log in to alice or bob,
+# so we need to modify the passwd file to restrict access.
+#$INSTALL_UCLA/userchop.sh
+
+#mv /etc/passwd /etc/passwd.orig
+#mv /tmp/passwd /etc/
+#chown root:root /etc/passwd
+#chmod 644 /etc/passwd
+#rm /tmp/passwd
+
+# get the name of this host
+MYHOST=${HOSTNAME%%.*}
+echo "Installing/starting '$MYHOST' specific software..."
+
+echo "Setting up SSL..."
+
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y apache2 libcgi-pm-perl elinks links wget netcat nmap curl net-tools
+cp -r $THISLAB/ssl/ /etc/ssl/
+cp $THISLAB/scripts/apache2.conf /etc/apache2/apache2.conf
+a2enmod ssl
+a2enmod cgi
+a2ensite default-ssl
+/etc/init.d/apache2 restart &>> $ILOG
+
+echo "Installing web documents..." &>> $ILOG
+
+echo "Installing/starting movie scripts et al..." &>> $ILOG
+cp -ar $THISLAB/sources /var/
+cp $THISLAB/scripts/linechoose.pl /usr/local/bin/
+chown root:www-data /usr/local/bin/linechoose.pl
+chmod 755 /usr/local/bin/linechoose.pl
+
+mkdir /usr/lib/cgi-bin
+chmod 755 /usr/lib/cgi-bin
+for i in access1.cgi access2.cgi; do
+	cp $THISLAB/scripts/$i /usr/lib/cgi-bin/
+	chown www-data:www-data /usr/lib/cgi-bin/$i
+	chmod 755 /usr/lib/cgi-bin/$i
+done;
+
+# install telnetd
+DEBIAN_FRONTEND=noninteractive apt-get install telnetd -y &>> $ILOG
+
+echo "Adding users..." &>> $ILOG
+useradd jimbo  &>> $ILOG
+echo "jimbo:goofy76" | chpasswd  &>> $ILOG
+useradd jambo &>> $ILOG
+echo "jambo:minnie77" | chpasswd &>> $ILOG
+useradd jumbo &>> $ILOG
+echo "jumbo:donald78" | chpasswd &>> $ILOG
+
+# install stock posting script
+killall stockpost.pl
+cp $THISLAB/scripts/stockpost.pl /usr/local/bin/
+chown root:root /usr/local/bin/stockpost.pl
+chmod 755 /usr/local/bin/stockpost.pl
+
+# start stock posting script
+pushd /
+/usr/local/bin/stockpost.pl &> /dev/null &
+
+# share/proj are unmounted in parent script
+
+echo "Success! Creating success stamp." &>> $ILOG
+
+CreateStamp
+
+echo ">>> Configuration complete." &>> $ILOG
+
+YesLogin
+
+
+# unmount source files
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	rm -rf /tmp/alice/*
+fi
+
+if [ $KEEPLOG -eq 0 ]
+then
+	rm $ILOG
+	rm /tmp/labinstall.log
+fi

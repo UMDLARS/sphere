@@ -1,0 +1,970 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="index,nofollow">
+
+<title>Man in The Middle and other Network Attacks</title>
+
+<link rel="stylesheet" type="text/css" charset="utf-8" media="all" 
+href="https://www.isi.deterlab.net/common.css">
+<link rel="stylesheet" type="text/css" charset="utf-8" media="screen" 
+href="https://www.isi.deterlab.net/screen.css">
+
+</head><body dir="ltr" lang="en">
+
+<div id="page" dir="ltr" lang="en">
+<h1>Man in The Middle and other Network Attacks</h1>
+<div class="author">Created by: Peter A. H. Peterson and Dr. Peter Reiher, UCLA {pahp, reiher}@cs.ucla.edu<br>
+</div>
+
+<!--
+<div class="due-date">Put your due date here if you are including the exercise in your class.</div>
+-->
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+<strong>Important!</strong> This experiment has a tendency to stay "swapped in" because the nodes on the system appear to be "busy". We don't want our labs to waste DETER resources, so in order to make sure that unused nodes are not left idle, the <strong>maximum</strong> amount of time this lab will stay swapped in at once is <strong>six hours</strong>. If you need it for more than six hours in one sitting, you will need to swap out and back in again some time before that.
+
+</div>
+
+
+<div class="table-of-contents">
+<div class="table-of-contents-heading">Contents</div>
+<ol type="1">
+<li><a href="#overview">Overview</a>
+<li><a href="#reading">Required Reading</a>
+	<ol>
+	<li><a href="#dsniff">Sniffing Ethernet</a>
+		<ol>
+		<li><a href="#dhub">Shared Medium</a></li>
+		<li><a href="#dswitch">Switched Networks</a></li>
+		</ol></li>
+	<li><a href="#darp">ARP Spoofing</a></li>
+	<li><a href="#deaves">Eavesdropping</a></li>
+	<li><a href="#dreplay">Replay Attacks</a></li>
+	<li><a href="#dinsertion">Insertion Attacks</a></li>
+	<li><a href="#dmitmvenc">MITM vs. Encryption</a>
+		<ol>
+		<li><a href="#dpki">Public Key Encryption</a></li>
+		<li><a href="#dmitm">Man In the Middle Attacks</a></li>
+		</ol></li>
+	<li><a href="#tools">Software Tools</a>
+		<ol>
+		<li><a href="#tcpdump">tcpdump</a></li>
+		<li><a href="#chaosreader">chaosreader</a></li>
+		<li><a href="#ettercap">Ettercap</a>
+			<ol>
+			<li><a href="#etterstart">Getting Started</a>
+			<li><a href="#ettermitm">SSL Attacks</a>
+			<li><a href="#ettertips">Interface Tips</a>
+			<li><a href="#etterfilters">Ettercap Filters</a>
+			<li><a href="#etterlinks">Ettercap Links</a>
+			</ol></li>
+		</ol></li>
+	</ol></li>
+<li><a href="#intro">Introduction</a>
+<li><a href="#assignment">Assignment Instructions</a>
+	<ol>
+	<li><a href="#setup">Setup</a>
+	<li><a href="#tasks">Tasks</a>
+		<ol>
+		<li><a href="#eaveassign">Eavesdropping</a></li>
+		<li><a href="#insertassign">Insertion</a></li>
+		<li><a href="#replayassign">Replay</a></li>
+		<li><a href="#mitmassign">MITM vs. Encryption</a></li>
+		</ol>
+	<li><a href="#glitches">What Can Go Wrong</a>
+	</ol></li>
+<li><a href="#extra">Extra Credit</a>
+<li><a href="#submission">Submission Instructions</a>
+</ol>
+</div>
+
+<span class="anchor" id="overview"></span> 
+<h2>Overview</h2>
+
+<p />
+The purpose of this lab is to introduce you to the concepts of sniffing, insertion, replay, and Man-in-the-middle (MITM) attacks, and to give you opportunities to execute these attacks in a testbed. You should have a solid grasp of networking as from an undergraduate networking course, and be familiar with basic programming principles. 
+
+<p />
+After successful completion this lab, you will: 
+
+<ol type="1"><li>understand the basics of network sniffing 
+</li><li>understand the basics of replay attacks 
+</li><li>understand the basics of insertion attacks 
+<ul><li>including the development of your own filters for Ettercap 
+</li><li>including common programmatic defenses against replay attacks 
+</li></ul></li><li>understand the general concepts of man-in-the-middle attacks 
+</li><li>execute sniffing, replay, and insertion attacks against cleartext data 
+</li><li>execute MITM attacks against strong cryptography
+</ol>
+
+
+<span class="anchor" id="reading"></span> 
+<h2>Required Reading</h2>
+
+
+<p />
+"Man-in-the-middle" is a term used in cryptography to describe scenarios where an attacker (the eponymous "man in the middle") between two remote parties can view or control data that would otherwise be secure. "Man-in-the-middle attack" usually refers to vulnerabilities in a key-exchange protocol whereby an attacker can subvert the encryption (typically by substituting secure keys with insecure keys) and gain access to the cleartext without the victims' knowledge. Man-in-the-middle attacks are possible due to characteristics of common networking protocols that make eavesdropping and other "insecure" activities possible. 
+
+<p />
+
+<span class="anchor" id="dsniff" />
+<h3>Sniffing Ethernet</h3>
+
+<p />
+Ethernet is by far the most common data link (or "layer 2") protocol in typical LANs.  Ethernets work by passing "frames" (analogus to what TCP/IP calls "packets") on a shared medium according to an algorithm that attempts to be fair. While TCP/IP packets are addressed by port and IP address, Ethernet packets are addressed by a MAC (<a class="http" href="http://en.wikipedia.org/wiki/Media_Access_Control">Media Access Control</a>) address. Every  Ethernet card has a unique, manufacturer-assigned MAC address (although this can often be changed in software) that is included in the header of an Ethernet frame. This address allows Ethernet frames to be addressed to and recognized by the interface that is meant to receive it. 
+
+<p />
+<span class="anchor" id="dhub"></span> 
+<h4>Shared Medium</h4>
+
+<p />
+Due to the broadcast nature of Ethernet, there is <em>nothing</em> stopping one interface from "hearing" a packet destined for another host on the same network segment or medium (colloquially called "the wire"). However, Ethernet hardware is typically configured to ignore <em>at the hardware level</em> any frames that do not match its MAC address. This ignorance is <em>by convention only</em> and serves two purposes; it reduces the amount of data an interface is required to process, and it provides a small amount of "soft security" through voluntary behavior since end users do not normally have direct access to the Ethernet hardware. 
+
+<p />
+However, most (if not all) Ethernet interfaces are perfectly capable of receiving and decoding all Ethernet frames on the wire. This usually requires putting the interface into so-called promiscuous mode, which passes <em>all</em> Ethernet frames on the network segment to the operating system. 
+
+<p />
+Even though most network traffic these days uses TCP/IP or UDP/IP, those packets are still encapsulated in Ethernet frames for transport on the local network segment. This means that if an interface is in promiscuous mode, then all traffic on the segment -- including TCP and UDP -- can also be decoded. 
+
+<p />
+Older network infrastructure hardware used a fully "shared media" paradigm; these network devices are called Ethernet hubs. An Ethernet hub is essentially a physical layer (layer 1 in the OSI model) repeater that broadcasts every inbound packet out on every port but the one that received the packet. This means that logically, all computers connected via a hub are sharing a single "network segment" as if they were connected to the same physical wires. 
+
+<p />
+This method is simple and cheap, because it fundamentally requires very little hardware which was important in the early days of computer  networks. However, this design has two significant  drawbacks due to the fact that it broadcasts data to places that do not need it. First, it creates a scaling issue because hubs use more bandwidth than is necessary since traffic is broadcast on wires where it is not needed. This causes unnecessary packet collisions and directly limits the size of a hub network due to link saturation. Second, (and more importantly for the purposes of a security class) hub networks send data to interfaces that are not meant to be recipients of the data. While this is technically "correct behavior," it enables data compromise. Incidentally, 802.11 wireless Ethernet networks are extremely similar to Ethernet hub networks, precisely because all hosts share the same "medium" -- the radio waves within proximity of the access point. 
+
+<p />
+This means that a computer connected to a hub or wireless network, using an interface in promiscuous mode, can listen to <em>all</em> traffic to and from any host connected to the same network segment. Because of all the above considerations, most wired Ethernets today have eliminated hubs for a faster and more efficient device, the switch. 
+
+<p />
+<span class="anchor" id="dswitch"></span> 
+<h4>Switched Networks</h4>
+
+<p />
+An Ethernet switch requires a certain amount of memory and a microcontroller because it is a link layer device and must understand certain elements of the Ethernet protocol. In particular, a <em>switch</em> keeps track of which MAC addresses are present on each of its ports. When an Ethernet frame comes into a switch, the  switch extracts the destination MAC address from the frame header, and checks to see if it knows which port that MAC address is on. If the switch thinks it knows what port the receiver is on, it sends the frame out on that port only. If it doesn't know what port that MAC is on, it sends the frame out on all ports, in the hopes that a host will receive it and respond, at which point the switch will know where the new MAC address is located. 
+
+<p />
+The "intelligent" nature of a switch (versus a hub) addresses the scaling issues of hubs by transmitting data on as few network segments as possible. This means that compared to a hub, an interface on a switch typically has much less traffic on its network segment. Where a host on a hub could see all traffic, because the hub acts as a single shared medium, a host on a dedicated switch port (even in promiscuous mode) typically sees only traffic that it sends or receives as though it were on its own network segment. 
+
+<p />
+Security researchers have developed several attacks against switched networks with the intent to increase the amount of traffic that an interface can see -- in effect, to make a switch act more like a hub for the purposes of eavesdropping. One early attack was based on the fact that many switches will "fail over" into a "hub mode" when overloaded. Fortunately, it is harder to force a switch to fail over today than it used to be. This technique is also conspicuous because of the large amounts of bogus traffic it generates. 
+
+<p />
+Unfortunately, there is another technique that is almost impossible to defend against. 
+
+<p />
+<span class="anchor" id="darp"></span> 
+<h3>ARP Spoofing</h3>
+
+<p />
+ARP Spoofing</a> is a technique for redirecting traffic that can allow an arbitrary interface on an otherwise unsecured switched network to receive traffic that would not normally be sent to it. 
+
+<p />
+The <a class="http" href="http://en.wikipedia.org/wiki/Address_resolution_protocol">Address Resolution Protocol</a>, or ARP, is used to to resolve a network layer address (e.g., IP address) to a link layer address (e.g., MAC address). When a host wishes to send a TCP/IP packet to a remote host, it first creates the TCP/IP packet. However, the hardware in the network interface must encapsulate the packet in a link layer frame (commonly Ethernet) before sending the data out on the wire. In order to assign the frame to the correct destination address, the local host must use ARP to determine which hardware address corresponds to the IP address in question. This involves sending special ARP messages called <em>ARP Requests</em> on the local Ethernet and receiving replies from hosts that have the answer. 
+
+<p />
+For example, the host <tt>10.10.10.20</tt> needs to send data to the Internet. In order to reach the  Internet, it must send the data through its default gateway, which is configured with IP address <tt>10.10.10.10</tt>. The sending host <tt>10.10.10.20</tt> needs to know what  Ethernet address <tt>10.10.10.10</tt> has in order to put the correct MAC address in the  frame header. In order to discover this, <tt>10.10.10.20</tt> needs to broadcast an ARP request to all Ethernet nodes: 
+
+<p />
+
+<pre>arp who-has 10.10.10.10 tell 10.10.10.20
+
+
+</pre>
+<p />
+... Hopefully, 10.10.10.20 will receive a reply like: 
+
+<p />
+
+<pre>arp reply 10.10.10.10 is-at 2e:2f:30:31:32:33
+
+</pre>
+<p />
+... from some host that knows the answer. Host 10.10.10.20 will update its ARP tables associating the IP 10.10.10.10 with the MAC address 2e:2f:30:31:32:33 and won't ask again for some time. 
+
+<p />
+ARP Spoofing relies on the decentralized, unauthenticated, and completely trusting nature of ARP to succeed. In ARP Spoofing, the attacker (or spoofer) tells specific hosts or entire networks that <em>its MAC address</em> should be associated with the victim's IP address, rather than the correct MAC to IP mapping. This is commonly used to tell network hosts that an <em>attacker</em> is the default gateway instead of the real default gateway.  The spoofer keeps the victim's <em>real</em> MAC address in its ARP table, and prepares to receive data from network hosts. 
+
+<p />
+When an attacker pretends to be the default gateway for a network, all hosts that received the bogus ARP messages now believe that the <em>spoofer's</em> MAC should be inserted into any Ethernet frame destined for the Internet or another IP subnet instead of the real default gateway's MAC address. <strong>This is especially meaningful</strong> because Ethernet switches <em>build their own ARP tables</em> in order to efficiently direct traffic and avoid broadcasting like a hub. This means that <em>Ethernet switches will be fooled in addition to the remote hosts</em>. As a result, switches will direct default gateway-bound traffic to the <em>spoofer</em>, not the <strong>real</strong> default gateway. Furthermore, a spoofing host that wishes to remain undetected can <em>rewrite and forward the Ethernet frames to the real default gateway</em>. This method silently maintains the victim's connections while routing them conveniently under the nose of the sniffer. In this way, ARP Spoofing acts as a kind of network reconfiguration at the data link layer and highlights Ethernet's dependence on ARP. 
+
+<p />
+At this point, the spoofing host has almost total control of the network traffic and can see and sniff arbitrary hosts' data with the use of a promiscuous interface and packet sniffing software. ARP Spoofing does slow down network traffic because of the additional hops and procesessing involved, but the clever attacker will target only the hosts she wants to affect, rather than the whole network. ARP Spoofing also requires multiple spoofing actions to maintain the tables in their bogus state, but this is not a difficult burden to bear. Furthermore, the careful spoofer can restore the ARP tables of the network before quitting, resulting in minimal network disruption due to the spoofing. 
+
+<p />
+While there are strategies against ARP Spoofing, notably ARP monitoring, fixed ARP tables and <a class="http" href="http://en.wikipedia.org/wiki/VLAN">VLAN</a>s, these are expensive in terms of maintenance, network design, and may require specialized hardware. Because of this, most networks in use today are at least partially vulnerable to ARP Spoofing attacks. 
+
+<p />
+Being the "man in the middle" gives you the opportunity to perform several different kinds of network attacks. Each type of attack can be executed in many different ways with many different goals; the following is just a brief overview. 
+
+
+<span class="anchor" id="deaves" />
+<h3>Eavesdropping</h3>
+
+<p />
+Eavesdropping generically refers to intentionally listening to a private conversation. In the context of computer networks, this is often called <em>sniffing</em>, and involves receiving and decoding network packets on your network segment that are not sent by or meant to be received by your host. 
+
+<p />
+The usefulness of sniffing is immediately obvious when the data is being passed in plain text, because any "cleartext" data sniffed is data that can be immediately read. Usernames and passwords are often easy to extract with a little protocol knowledge or an ASCII decoding of the network data. 
+
+<p />
+In the old days, almost no network traffic was encrypted because it required more memory and CPU power, which were both considered too valuable when compared against the likelihood of meaningful losses caused by a sniffing attack. As a result, the TELNET remote shell program remained popular into the late 1990s even though all data and authentication information were sent in cleartext. 
+
+<p />
+Nowadays however, sniffing is one of the most common and easiest attacks to execute due to the proliferation of computer networks, free user-friendly sniffing tools and especially wireless LANs where sniffing requires only proximity and a laptop.  Most web traffic is unencrypted, along with many other protocols such as SMTP and IMAP (email). Most remote shell traffic is now encrypted due to the tremendous risk in sending system authentication information unencrypted, but often SMTP, IMAP, or web forum passwords are still unencrypted and may often be the same as more sensitive system passwords. (For example, John's unencrypted webmail password may be the same as his login password on the same system, even though the system uses SSH for logins.) Additionally, while TELNET is not often used for sensitive Internet traffic, it is still used in many internal networks (like companies and banks) because of legacy systems that cannot handle encryption. 
+
+<p />
+Tools such as <a href="#tcpdump">tcpdump</a> and <a class="http" href="http://en.wikipedia.org/wiki/Wireshark">Wireshark</a> are both  very powerful, freely available sniffing programs and are available for most computer platforms in use today. For more information, please see their manpages or online documentation. 
+
+<p />
+<span class="anchor" id="replay"></span> 
+
+<p />
+
+
+<span class="anchor" id="dreplay" />
+<h3>Replay Attacks</h3>
+
+<p />
+Replay attacks can be more damaging and successful than mere eavesdropping because they can cause remote actions -- sometimes even against cryptography. 
+
+<p />
+The basic idea of a replay attack is to capture packets sent on a wire between two hosts with the intent to later to replay the payloads (or more rarely the same packets) in order to effect the same result. For example, most web based CGIs are extremely susceptible to primitive replay attacks because they are stateless and respond to a single web request with the appropriate information in the request. This request is usually built up over several page requests, but can often be triggered by submitting a full request at once. 
+
+<p />
+Imagine an online greeting card application that has several steps, all managed by the same CGI application, with all input saved in the background (traditionally done with hidden form fields): 
+
+<ol type="1"><li><p />
+The first page takes your login name and password: (user: <em>rms</em>, password: <em>gnu</em>) 
+</li><li><p />
+The second page takes the address of the recipient: <em> <a class="mailto" href="mailto:esr@catb.org">esr@catb.org</a> </em> 
+</li><li><p />
+The third page selects an image: <em>h2obuffalo.jpg</em> 
+</li><li><p />
+The fourth page provides an entry form for the message: <em>Happy Hacking!</em> 
+</li><li>The fifth page previews and submits and sends the card. 
+</li></ol><p />
+This process would normally take 5 steps by a human, with the possibility of going backwards and forwards to edit form fields. However, the whole process can often be summed up in one HTTP request like this: 
+
+<p />
+
+<pre>http://example.com/card.cgi?login=rms&amp;pass=gnu&amp;addr=esr@catb.org&amp;img=h20buffalo.jpg&amp;msg="Happy Hacking!"&amp;submit=submit
+
+
+</pre>
+<p />
+Loading that single URL will skip the whole process and directly send the above card. This is a simple example of the "payload" type of replay attack, where the commands included in a network stream are reissued to a server. 
+
+<p />
+While this URL could be sniffed and entered manually, one can imagine capturing the entire stream of packets (including the TCP handhshake) that generated the single HTTP request that resulted in sending the card. After the capture, we might simply re-inject the packets into the network. While this seems like it should work, TCP and other protocols use sequence numbers are are chosen pseudorandomly upon connection initiation. Without valid sequence numbers, a naive "replay" of packets into the network will be rejected by the server. This is why "payload" replay attacks are popular, and incidentally highlights one reason why unpredictable numbers are critically important in security. 
+
+<p />
+On the other hand, some protocols, such as UDP, do not necessarily use sequence numbers -- in this case, a direct replay attack of a data stream could be successfully processed by a server. One can imagine replaying a network capture back onto the network, ignoring any response from the server or replaying the appropriate packets if necessary. If done properly, it would look as though those packets simply "appeared" in the network, and because their headers would already contain the information from the <em>original sender</em>, the traffic would appear as though it were coming <em>from</em> the original sender, not the host executing the replay attack. Regardless, the result is the same -- using commands that are known to be valid to achieve the same result without authentication. 
+
+<p />
+Regardless of whether you are using "direct" packet replay attacks or more complicated "payload" replay attacks, they can be used for many purposes; one can easily imagine a web or other network conversation giving a user a raise or increasing or decreasing a balance of some kind, from something mostly harmless (like World of Warcraft hitpoints) or something more significant, like an airplane ticket purchase. If that conversation can be replayed, the same effect can be obtained repeatedly. 
+
+<p />
+"Direct" Replay attacks work when there is nothing <em>unique</em> about particular transactions other than the request parameters or data payload. The main defense against such an attack are unpredictable (but easily validated) session tokens in the communication that ties a sequence of packets to a unique request. It is not enough to use the current time or a hash of the packet data, because this can easily be guessed or recalculated in a replay attempt. 
+
+<p />
+Good session tokens are a form of the <a class="http" href="http://en.wikipedia.org/wiki/Cryptographic_nonce">cryptographic nonce</a>. Ultimately, <a class="http" href="http://www.freesoft.org/CIE/Course/Section4/9.htm">TCP sequence numbers</a> are a kind of nonce -- they prevent the same data from being used in the future to achieve the same results. 
+
+<p />
+The concept of nonces and packet sequence numbers is often applied to<a class="http" href="http://en.wikipedia.org/wiki/Remote_procedure_call">RPC transactions</a> in order to make individual transactions unique regardless of the underlying network characteristics. 
+
+<p />
+For example, suppose we added a nonce field to our e-card application: 
+
+<p />
+
+<pre>http://example.com/card.cgi?nonce=aksdjf2fk&amp;login=rms&amp;pass=gnu&amp;addr=esr@catb.org&amp;img=h20buffalo.jpg&amp;msg="Happy Hacking!"&amp;submit=submit
+
+
+</pre>
+<p />
+The field <tt>nonce</tt> consists of a random string of enough length so as to be unguessable which is assigned by the server when the session was first initiated. The nonce would no longer be valid after a certain amount of time, or after the card was successfully sent. In this way, a replay of this stream would include the invalid (already used) nonce "aksdjf2fk", which would be flagged as invalid by the e-card server and summarily rejected. (A request without a nonce would be rejected outright.) 
+
+<p />
+It is also very important to understand that encryption alone does not protect against replay attacks unless there is some kind of nonce or other secret (e.g. session id) within the encrypted packets. For example,with encryption, the original e-card URL could have looked like: 
+
+<p />
+
+<pre>http://example.com/cryptocard.cgi?session=lkadjf092lfkj2f0-20f2p2fusldkjf0294u8rklj;sdf8-908lkdjsf92344f
+
+</pre>
+<p />
+... where "lkadjf092lfkj2f0-20f2p2fusldkjf0294u8rklj;sdf8-908lkdjsf92344f" represents some kind of ciphered session state <em>without</em> a nonce. There is no reason why <em>this</em> conversation couldn't be replayed with the same success as the original session, resulting in a second card being sent. 
+
+<p />
+There are many tools that are capable of capturing and replaying traffic. For the purposes of this course, we'll use <a href="#tcpdump">tcpdump</a> for capturing,   with <a href="#chaosreader">chaosreader</a> to extract packet payload data. 
+
+<p />
+<span class="anchor" id="insertion"></span> 
+
+<p />
+
+
+<span class="anchor" id="dinsertion" />
+<h3>Insertion Attacks</h3>
+
+<p />
+Insertion Attacks are essentially replay attacks where an attacker changes existing or inserts new data in the network conversation. For example, in the e-card example, an insertion attack could have changed the message in the replayed card from "Happy Hacking" to "Drop Dead!" (although that wouldn't be very nice). Furthermore, this is a less impressive kind of insertion attack because it relies on the first e-card being sent before the modified message could be replayed. 
+
+<p />
+In fact, typically, an "insertion attack" means that the attacker has the ability to capture, modify, and resend valid packets <em>as though they were the original data stream</em>. At the very least, this involves capturing the packet,  editing, updating any relevant header information (especially the data payload checksum), and resending the modified packet. 
+
+<p />
+This is a "man in the middle" attack in the sense that it requires an entity on the network that has the capability to block transmission of the original packets and send the modified packets. (We usually imagine this entity directly between two communicating parties, but that need not physically be true.) Sophisticated  insertion attacks can even modify the responses in order to make the original host think everything has gone according to plan. 
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+Sometimes people use "man in the middle" loosely to refer to any kind of network attack. However, the canonical Man in the Middle attack refers to a specific kind of attack against cryptosystems. We'll discuss this in detail in the next section.
+</div>
+
+
+<p />
+One extreme way of doing this is to insert a computer in the middle of the network that acts as a gatekeeper and is capable of modifying traffic. In this sense, an application proxy performs beneficial "insertion attacks" on a network. For example, a web proxy can exchange all graphics for locally cached copies if they exist. In fact, this is one technique that many "<a class="http" href="http://en.wikipedia.org/wiki/Web_accelerator">web accelerators</a>" use -- they replace images and other content with compressed versions, or in the case of images, lower quality lossy-compressed versions. 
+
+<p />
+A more stealthy way of performing insertion attacks is using ARP Spoofing as described above to convince hosts to send their data to the attacker <em>first</em>, who will then typically forward the data on after modifying it. This doesn't require modifying the physical nature of the network in any way, and can often be performed undetected from anywhere (even across the Internet) as long as the attacker can directly control an interface on the LAN (e.g. after exploiting a software vulnerability to take over a host). 
+
+<p />
+Encryption can obviously hinder the opportunities for successful insertion attacks, but poor use of encryption can still leave open the opportunity to decrypt the packet, change it, and reencrypt the packet before resending. This is especially true if a cryptographic nonce or other kind of session token can be reverse engineered -- if a correct nonce can be generated or recalculated (like a TCP checksum) the nonce has lost its usefulness. 
+
+<p />
+In this lab, we will use <a href="#ettercap">Ettercap's</a> extensive filtering capabilities for insertion attacks. 
+
+
+<span class="anchor" id="dmitmvenc" />
+<h3>MITM vs. Encryption</h3>
+
+<p />
+While all the above kinds of attacks require a malicious user to have special access to the network, the canonical MITM attack refers to an attack against the key exchange portion of a cryptosystem (which may otherwise be resistant to cryptanalysis). In the canonical MITM attack, a user intercepts the keys as they are exchanged, and then inserts new keys. By doing this, the attacker can encrypt and decrypt all messages, and the communicating parties are none the wiser.  
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+While this isn't an MITM attack, insertion attacks have sometimes been used to downgrade a connection from a more secure protocol to a less secure protocol by tricking the parties into thinking that one or more clients can only support a less secure protocol. Imagine if you could make SSH simply downgrade to TELNET by claiming that the client can't perform encryption!
+</div>
+
+
+<p />
+
+<span class="anchor" id="dpki" />
+<h4>Public Key Cryptography</h4>
+
+<p />
+While this is not a lab on public key cryptography, the basic idea of public key cryptography  is that each host or service has two mathematically related keys. One key (the public key) is used to encrypt data and is public, is registered to a single user or organization, and is widely and freely distributed. The the other key (the private key) is used to decrypt data and is known only to the recipient.  Because the private key remains <em>private</em>, a file encrypted with a user's public key can only be decrypted by the user holding the private key. If two parties have each others' public keys, they can encrypt a  conversation using the public keys, and decrypt that conversation with the private keys that they each hold. 
+
+<p />
+This is all cryptographically sound, <em>as long as the key exchange is performed in a secure manner</em>. But, aye, there's the rub: how do you exchange keys securely over an insecure medium open to <strong>insertion attacks</strong>? Unfortunately, there are few good answers, and none in wide use. 
+
+<p />
+
+<span class="anchor" id="dmitm" />
+<h4>The Man In The Middle Attack</h4>
+
+<p />
+The man in the middle attack works like this:
+<p />
+Alice and Bob want encrypt their chat session, but neither Alice nor Bob have each others' public keys. In order to communicate securely, Bob and Alice need to send their public keys (bob.pub and alice.pub) to one another. Once both hosts have each others' public keys, they can begin encrypting their packets, secure in the knowledge that only the intended recipient can decrypt the data. 
+
+<p />
+However, imagine there is a user in the middle of the network, known as Eve. Eve wants to listen in on the conversation between Alice and Bob. In order to do this, Eve runs an application that accepts the real public keys alice.pub and bob.pub from Alice and Bob, but sends them both different <em>bogus</em> public keys, <em>bob1.pub</em> and <em>alice1.pub</em>. Bob and Alice don't know any better and will use the bogus public keys instead of the real public keys to encrypt packets for each other. Both Alice and Bob believe that they are using the correct public keys, and expect to decrypt the messages with their own private keys. How can they use their original private keys to decrypt these bogus messages? 
+
+<p />
+The answer is that Eve (as the "Man" in the Middle) captures and decrypts the packets with the private keys for the bogus bob1.pub and alice1.pub, inserts or merely eavesdrops on the connection, and reencrypts the data with the <em>original</em> public keys that Alice and Bob sent (alice.pub and bob.pub) and forwards the packets to their original destination. Bob and Alice decrypt the packets with their own private keys, and so don't realize that their connection has been hijacked because from their perspective, the session behaved <b>perfectly</b>. 
+
+<p />
+Modern implementations of public key cryptography for network services rely on  several different secure key exchange methods. By default, SSH will pass the public key to the client the first time in cleartext. During this first key exchange, the connection is vulnerable to a MITM attack, and if this is a serious concern, the key should be installed by hand from trusted media or encrypted with preexisting trusted keys before being sent over an insecure network. 
+
+<p />
+After the initial key exchange, the public key is saved and associated with the IP address in the ssh configuration file~/.ssh/known_hosts (or the Windows Registry if using PuTTY), so that if a different key is sent by a man in the middle (see the discussion of HTTPS below) or even if it is  legitimately changed on the remote host it will be noticed and an alert will be generated. Compromise happens either by intercepting the initial exchange or by tricking a user into accepting an illegitimately changed key. 
+
+<p />
+"Tricking the user" is easier than you might think, because due to 
+configuration issues, sooner or later most users of ssh will encounter an unexpected key change. This is usually not a security issue and functionally speaking, the "right" thing to do is usually to ignore the warning and accept the new certificate. It is usually worth a little investigation, but most of the time the key change is either expected (e.g., server upgrade) or understood (e.g., erased known_hosts file). Sometimes a user can't be sure why the key has changed, but might be able to consider several plausible explanations that encourage them to accept the key without being <em>certain</em> what is happening. For better or worse, in the vast majority of common cases the user ends up correctly ignoring the warning, sometimes even facilitating the process by deleting an old key locally.  This conditioning makes an attacker's job easier, because users have learned that key issues do not usually signal an attack. 
+
+<p />
+Secure HTTP (HTTPS) uses a different strategy. Instead of hoping that the first transmission was secure or requiring the users to perform some out-of-band transfer, HTTPS key validation relies on "<a class="http" href="http://en.wikipedia.org/wiki/Trusted_third_party">trusted third party</a>" verification of public key certificates. This means that if you run a web server and you want to ensure visitors that the keys used by your website really belong to you, you buy a certificate from a trusted third party such as VeriSign or Thawte. This certificate lists the host, IP address, name, and other identifying information. When a user attempts to open a new SSL connection to your server, your browser will inspect the certificate to make sure that it is certified by a trusted party (by checking it against a list of parties that it is configured to trust) and that its identification lines up with the server on which it is being used. If it doesn't, the browser will complain and ask you whether to accept the certificate. 
+
+<p />
+Unfortunately, while SSH's error message for key mismatch is loud and frightening ("<strong>IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!</strong>"), most web browsers key alert messages are apologetic and deferential by comparison. Most users simply accept the questionable key which may or may not be malicious. This may be related to the fact that signed web certificates are expensive and many non-commercial websites choose to use self-signed certificates instead of paying for third-party verification. Another common problem is the fact that an SSL certificates can be invalidated by <em>accident</em> fairly easily (changing an IP address for example) and expire over time, or can be correct but lack the third-party endorsement. This "mostly correct" scenario <em>feels</em> more secure than one that is flagrantly wrong (e.g., one that says it's for "youarehacked.com" instead of "bankofamerica.com"),  but it is <em>trivial</em> to create a certificate that has all the correct information (except the third party signature) yet is still totally bogus. What's worse, ARP Poisoning attacks can be used to intercept and modify the network transactions required to validate certificates, making forgeries appear authentic to the user and the computer. 
+
+<p />
+Typical MITM attacks against cryptography <strong>rely</strong> on the attacker's <em>unexpected</em> ability to be interposed in the network and the haste and trust that most users have when dealing with computers. Furthermore, most users  are not even <em>remotely aware</em> how likely this kind of attack might be performed and normally approve whatever is necessary to keep doing what they were doing, even if that undermines security. When an attacker is performing a MITM attack against a server with a legitimate SSL certificate, the end user usually only notices that there is "some kind of error" and they just click OK. 
+
+<p />
+We will perform this kind of attack using <a href="#ettercap">Ettercap</a>. 
+
+<span class="anchor" id="tools" />
+<h3>Software Tools</h3>
+
+<p />
+
+<span class="anchor" id="tcpdump" />
+<h4>tcpdump: sniff and analyze network traffic</h4>
+
+<p />
+<a class="http" href="http://www.tcpdump.org/">tcpdump</a> is the <em>de facto</em> network <a class="http" href="http://en.wikipedia.org/wiki/Packet_sniffer">packet sniffer</a> for most operating systems including many commercial unices, free Unix-likes, Apple's OS X, and even Microsoft Windows. Originally written at Lawrence Berkeley Laboratory (LBL), <tt >tcpdump</tt> is most frequently used for debugging networks and network applications because it gives a simple but comprehensive look into the traffic on an interface and requires no GUI. 
+
+<p />
+It is quite common for a network segment to carry the traffic of many hosts. However, network cards typically only process network frames that are destined for their host. This means that network applications can normally only view the traffic addressed to that host, even though most of the time there is traffic belonging to other hosts on the same wire. If you are testing the behavior of a network application sending or receiving data to your host, this is appropriate. 
+
+<p />
+However, Ethernet interfaces can be put into so-called promiscuous mode, where the network card passes <em>all</em> network data on the segment to the CPU and subsequently applications can see all network traffic on the interface. If a user wishes to sniff the network for more than their own traffic, the interface must be put into promiscuous mode, either by the application or by a network configuration utility (such as <a href="#ifconfig">ifconfig</a> on Linux). 
+
+<p />
+<tt >tcpdump</tt> has various filtering and display options that you can investigate yourself, but the command you will probably find most useful for the course is:
+
+<p />
+<pre>
+$ sudo tcpdump -i ethN -s 1500 -X
+</pre>
+
+<p />
+This invokes <tt >tcpdump</tt> listening on ethernet adapter N, with a snaplength of 1500 bytes; using a smaller snaplen will not always show all the packet data (especially for large packets). The option -X decodes the data in hex and ASCII, similar to the display of hex editors like <tt >hexdump</tt>. 
+
+<p />
+<tt >tcpdump</tt> will stream all decoded information to the terminal, too quickly to read. You can use Control-C to kill <tt >tcpdump</tt> after enough time has passed and use your terminal's scrollbars to look at the output, use <tt >less</tt>, or use a terminal manager like <tt >screen</tt> for its scrollback features. 
+
+<p />
+You can also dump the capture to a special binary capture format with the <tt >-w</tt> switch: 
+
+<p />
+
+<pre>$ tcpdump -i eth1 -s0 -w output.pcap
+</pre>
+<p />
+The capture file is used with a utility like <a href="#chaosreader">chaosreader</a>. 
+
+<p />
+You can also output to a text file (not a binary capture file) <em>and</em> the terminal simultaneously using the Unix utility <tt >tee</tt> like this:
+
+<p />
+
+<pre>
+$ tcpdump -i ethN -s 1500 -X | tee output.log
+17:15:00.290656 IP laptop.local.39221 &gt; server.somehost.net.ssh: . ack 2272 win 5002 &lt;nop,nop,timestamp 327689043 282363814&gt;
+
+       0x0000:  4510 0034 e811 4000 4006 d56b 0a0a 0a58  E..4..@.@..k...X
+       0x0010:  4051 2884 9935 0016 6f1c 67f9 7ce3 83e5  @Q(..5..o.g.|...
+       0x0020:  8010 138a a57c 0000 0101 080a 1388 2353  .....|........#S
+       0x0030:  10d4 87a6
+</pre>
+<p />
+This output shows a packet en route from the host "laptop" from port 39221 to a server's ssh port (22). Following the header line is the decoded payload. It should be noted that tcpdump does not analyze the packet payload in order to determine the protocols shown in the header; it merely checks the port. 
+
+<p />
+<tt >tcpdump</tt> also has powerful header filtering options and its own filter syntax that you can read about online or in the <tt >tcpdump</tt> manpage. But here's a simple example, showing only traffic to or from a specific host: 
+
+<p />
+<tt>$&nbsp;tcpdump&nbsp;-i&nbsp;ethN&nbsp;-s&nbsp;1500&nbsp;-X&nbsp;host&nbsp;10.10.10.10&nbsp;|&nbsp;tee&nbsp;output.log</tt> 
+
+<p />
+Or a specific port instead (telnet traffic only): 
+
+<p />
+<tt>$&nbsp;tcpdump&nbsp;-i&nbsp;ethN&nbsp;-s&nbsp;1500&nbsp;-X&nbsp;port&nbsp;23&nbsp;|&nbsp;tee&nbsp;output.log</tt> 
+
+<p />
+These filtering terms can be more expressive with the use of the Boolean operators AND, OR, NOT, etc. Please see the manpage or other online resources for more information. 
+
+<p />
+Finally, if ARP spoofing has been set up (e.g. with ettercap), <tt >tcpdump</tt> is able to copy <em>all</em> the traffic sent across this interface (except decrypted SSL traffic -- see below). 
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+<a class="http" href="http://en.wikipedia.org/wiki/Wireshark">Wireshark</a> (formerly Ethereal) is essentially a very nice graphical application built  top of tcpdump's capabilities (using libpcap, the tcpdump library). If you are capturing packets in a graphical environment, Wireshark is highly recommended. 
+</div>
+
+<span class="anchor" id="chaosreader"></span> 
+<h4>chaosreader: inspect and analyze tcpdump captures</h4>
+
+<p />
+chaosreader is an application that extracts TCP connections, names, passwords, files, etc. from inside network traffic logs as captured by <a class="http" href="#tcpdump">tcpdump</a>. If you're curious how <tt >chaosreader</tt> works, edit the program with your favorite editor -- it's just a Perl script. 
+
+<p />
+The easiest way to use <tt >chaosreader</tt> is to create a capture file with <tt >tcpdump</tt> and the <tt >-w</tt> option, and then feed that capture file into <tt >chaosreader</tt> with this command: 
+
+<p />
+
+<pre>$ chaosreader output.pcap
+</pre>
+<p />
+This will create a set of HTML pages with all the relevant data in them. After running chaosreader, copy the files to your home computer (using <tt >scp&nbsp;-r</tt>) or use the text-only web browser elinks to  navigate through the pages to find the information you want. 
+
+
+<p />
+<span class="anchor" id="ettercap"></span> 
+
+<p />
+
+
+<h4>ettercap: play god on a switched network</h4>
+
+<p />
+<a class="http" href="http://en.wikipedia.org/wiki/Ettercap_(computing)">Ettercap</a> is a powerful tool for network analysis and security cracking. Ettercap has two main strengths: 
+
+<p />
+First, Ettercap is capable of performing <a class="http" href="http://en.wikipedia.org/wiki/Man-in-the-middle_attack">man-in-the-middle</a> attacks on many protocols, including SSH1 and HTTPS. Ettercap is capable of "filtering" packets, where it intercepts, changes, and resends packets on the fly. This could be as simple as changing all occurances of the word "buy" to "sell" in all web traffic, or as complex as exchanging the encryption keys in a secure transmission. 
+
+<p />
+Secondly, Ettercap is capable of fully automating ARP spoofing (also known as ARP poisoning) which is a technique whereby a computer on a switched network is capable of forcing other hosts to send their data to the attacker rather than the actual network gateway or destination. This allows an attacker to force arbitrary users to send their data to him first -- after which he can choose to send the traffic on, change it, or throw it away -- all without any privileged position on the network other than the complete control of one workstation. 
+
+<p />
+By the inclusion of ARP spoofing, expressive filters, and man-in-the-middle attacks, Ettercap is a one-stop-shop for many network attacks. Where such attacks used to require specialized software development (often customized for a particular network or attack), Ettercap is a user-friendly tool that makes network attacks incredibly simple. 
+
+<p />
+
+<span class="anchor" id="etterstart" />
+<h5>Getting Started</h5>
+
+<p />
+To get started with Ettercap: 
+
+<ol type="1">
+
+<li><p />Execute <tt >ifconfig</tt> and identify the interface on the <tt>10.x.x.x</tt> network. For example, it might be <tt>eth0</tt> or <tt>eth5</tt>. This interface may change from swap-in to swap-in so you must perform this step every time you swap in.
+
+<li><p />Become root by executing <tt>sudo su -</tt>. In our experiment, <b>Ettercap must be run as root</b> in order to function properly.
+
+<li><p />Start ettercap with <tt >ettercap -C -i ethN</tt> (where <tt>ethN</tt> is the interface from the <tt>ifconfig</tt> step). This starts Ettercap with the basic ncurses terminal interface. 
+
+<li><p />
+Choose "Unified Sniffing" from the <strong>Sniff</strong> menu. 
+</li>
+
+<li><p />
+find the hosts on the network <strong>(Hosts</strong> menu) 
+</li>
+
+<li>select targets (Add hosts to a target by highlighting them and pressing 1 in the Hosts list.) 
+</li>
+
+<li><p />
+spoof their ARP tables (Under <strong>MITM</strong> menu) 
+</li>
+
+<li><p />
+and begin sniffing the network. (Under <strong>Start</strong> menu) 
+</li>
+
+<li><p />
+While sniffing the network, you can use <tt >tcpdump</tt> as described above to log the sniffed traffic. 
+</li>
+
+</ol><p />
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+<strong>Ettercap is Experimental Software!</strong> Ettercap is not a commercial product and will occasionally crash. This is typically due to a segmentation fault -- not <i>your</i> fault. Other times, things that should work, might not. If you have problems with ettercap not working properly, try rebooting <tt>eve</tt> using <tt>sudo reboot</tt>. Only in the worst case should you need to fully swap the experiment out and back in again.
+</div>
+
+<span class="anchor" id="ettermitm" />
+<h5>SSL Attacks</h5
+
+<p />
+Part of this lab includes performing MITM attacks against SSL encryption. To perform SSL decryption, you will need to modify <tt >ettercap</tt>'s configuration file, which is located in <tt >/usr/local/etc/etter.conf</tt>. 
+
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+<strong>Logging with SSL Attacks:</strong> <tt >tcpdump</tt> doesn't work to log SSL MITM attacks, because the decrypted data never passes through <tt >eve</tt>'s network device. (Think about why.) Just use copy and paste from your terminal (View | Connections in <tt >ettercap</tt>) to log decrypted traffic. 
+</div>
+
+<p />
+While Ettercap is basically "point and click," part of the this lab is learning and experimenting with these tools, so feel free to poke around and look at other resources. The beauty of doing this on a testbed is that you really can't break anything. 
+
+<p />
+
+<span class="anchor" id="ettertips" />
+<h5>Interface Tips:</h5>
+
+<ul><li>Use 'Tab' and the arrow keys to change the window/menu you are interacting with. 
+</li><li>Use 'Control-Q' to close any active window in the Ettercap interface. 
+</li><li>There is more traffic than what you see in the "User Messages" window. Try looking under View | Connections and selecting a connection to view. 
+</li><li>To quit, press Control-X. This will "un-poison" the network and close. 
+</li></ul><p />
+
+
+
+<p />
+Example Ettercap screen: 
+
+<p />
+
+<pre>Start  Targets  Hosts  View  Mitm  Filters  Logging  Plugins  Help    NG-0.7.3
+┌──Hosts list...─────────────────────────────────────────────────────────────┐
+│                                                                            │
+│ 10.10.10.10      00:13:D4:04:44:CA                                         │
+│ 10.10.10.11      00:14:6C:3B:F3:9D                                         │
+│ 10.10.10.99      00:08:74:12:19:22                                         │
+│                                                                            │
+│                                                                            │
+│                                                                            │
+│                                                                            │
+│                                                                            │
+│                                                                            │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌──User messages:──────────────────────────────────────────────────────────────┐
+│1698 tcp OS fingerprint                                                       ▒
+│2183 known services                                                           ▒
+│Randomizing 255 hosts for scanning...                                         ▒
+│Scanning the whole netmask for 255 hosts...                                   ▒
+│3 hosts added to the hosts list...                                            ▒
+│                                                                              ◆
+└──────────────────────────────────────────────────────────────────────────────┘
+</pre>
+
+<p />
+
+<span class="anchor" id="etterfilters" />
+<h5>Ettercap Filters</h5>
+
+
+<p />
+Filters in Ettercap are tiny programs compiled by <tt >etterfilter</tt>, which are then interpreted by the Ettercap filter interpreter when loaded. The syntax is vaguely PHP-like so it is easy to use, but the debugging messages from <tt >etterfilter</tt> can be cryptic. You should <strong>avoid</strong> using the more complete regex filter functions, because their behavior is somewhat unpredicatble. Instead, use replace() and other simpler functions. 
+
+<p />
+Many students get confused when they do not see their filters being applied the way they expect them to. For example, students will set up a filter, tunnel in using <tt >ssh</tt>, and view the web page from their desktop computer. However, they won't see the changes from the filter. Why is that? This happens because when you tunnel into DETER, you are tunneling through <tt >users.deterlab.net</tt> <em>to</em> <tt >eve</tt>. And the network that <tt >users</tt> shares with <tt >eve</tt> is not the network being poisoned -- at least it shouldn't be -- you're poisoning the network that <tt >alice</tt>, <tt >bob</tt>, and <tt >eve</tt> share. Thus, 'users' (and you at home) do not see the effect of the filter. However, traffic between <tt >alice</tt> and <tt >bob</tt> should be being filtered -- you can see this using <tt >tcpdump</tt>, the connection viewer, or <tt >chaosreader</tt>. 
+
+<p />
+For instructions on how to use them, see  <tt >man&nbsp;etterfilter</tt> on DETER. There is also a sample ettercap filter in <tt >/root/</tt> on the <tt >eve</tt> host. 
+
+<p />
+
+<span class="anchor" id="etterlinks" />
+<h5>Ettercap Links:</h5>
+
+<ul><li><p />
+<a class="http" href="https://www.sans.org/reading-room/whitepapers/tools/ettercap-primer-1406">SANS Paper on Ettercap</a> -- this paper is about an older version of Ettercap, but most of the technical details are still accurate. 
+</li><li><p />
+<a class="http" href="http://www.irongeek.com/i.php?page=security/ettercapfilter">etterfilter tutorial</a> 
+
+</li></ul><p />
+
+
+<span class="anchor" id="intro"></span> 
+<h2>Introduction</h2>
+
+<p />
+It turns out that the recent leak of some memos at FrobozzCo regarding imminent downsizing (due to insecure software and permissive filesystem ACLs) made the top brass are scared of malicious insiders. As a result, they've ordered a vulnerability analysis. 
+
+<p />
+You've been hired at FrobozzCo ostensibly to replace one of the office assistants that has recently quit. None of the other employees know who you really are and think that you're just a temp. In reality, you've been hired by FrobozzCo's IT division to perform a <a class="http" href="http://en.wikipedia.org/wiki/Red_Team">Red Team exercise</a> against a portion of the network. 
+
+<p />
+Your assignment is to pretend that you are a disgruntled computer-savvy employee at FrobozzCo who recently discovered that your job is going to be eliminated. Since your job is over, you're supposed to steal as much information as you can and create as much chaos as possible; in other words the brass want to know how much damage a sufficiently motivated insider could do. 
+
+<p />
+You have a personal computer on the company LAN, which is a switched network. You share a network subnet with several computers that have some important responsibilities. The brass fear that someone could do a little corporate espionage on their way out the door and take it to Zembor Corporation, FrobozzCo's biggest competitor. 
+
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+<strong>WARNING:</strong> Red Team exercises <em>are</em> performed as a part of vulnerability analyses. However, they are only performed with express, written permission, non-disclosure agreements, and well-defined boundaries. Doing this without permission is illegal and carries <strong>severe legal penalties</strong>. So don't try this at home. 
+</div>
+
+
+
+<span class="anchor" id="assignment"></span> 
+<h2>Assignment Instructions</h2>
+
+<p />
+Performing this task and all subsequent tasks requires you to succesfully perform an ARP Spoofing attack against the other nodes in your network using <a href="#ettercap">Ettercap</a>. Other tools that might be useful for this task include <a href="#tcpdump">tcpdump</a> and <a href="#chaosreader">chaosreader</a>. 
+
+
+<p />
+<span class="anchor" id="setup"></span>
+<div class="level3"><h3>Setup</h3>
+
+
+<ol type="1"><li><p />If you don't have an account, follow the instructions in the <a href="http://docs.deterlab.net/education/student-intro/">introduction to DETER</a> document. 
+</li><li>Log into DETER. 
+</li><li>Create an instance of this exercise by following the instructions <a href="http://docs.deterlab.net/education/student-intro/#how-do-i-start-an-exercise">here</a>, using <tt>/share/education/MITM_UCLA/mitm.ns</tt> as your NS File.
+	<ul>
+	<li><p />In the "Idle-Swap" field, enter "1". This tells DETER to swap your experiment out if it is idle for more than one hour.
+	</li><li><p />In the "Max. Duration" field, enter "6". This tells DETER to swap the experiment out after six hours.
+	</li>
+	</ul>
+</li><li> Swap in your new lab. 
+</li><li>After the experiment has finished swapping in, log in to the node via ssh. 
+</li></ol><p />
+
+
+<p />
+For this lab, you will only have console access to the host <tt>eve.mitm.UCLAClass.deterlab.net</tt>; the hosts <tt>alice</tt> and <tt>bob</tt> will at be configured so that you can't log into them (at least to start!). 
+
+<p />
+It is <strong>very possible</strong> that actions you take in the course of this lab could kill important processes, erase files, or generally cause other havoc in the system. If you think that you have "broken" your lab nodes, you can always reboot the nodes, or if things are <em>really</em> screwed up, swap out the experiment and swap it back in to start fresh. As always, anything you save in your group directory on DETER will stay there -- make sure you save any important work somewhere safe. 
+
+
+</div>
+
+<span class="anchor" id="tasks"></span>
+<div class="level3">
+<h3>Tasks</h3>
+
+
+<span class="anchor" id="eaveassign"></span> 
+<h3>1. Eavesdropping</h3>
+
+<p />
+Your first task is to eavesdrop on all cleartext network traffic and document what the different traffic streams are communicating. 
+
+</p><div class="warning"> 
+<p> 
+<img src="alert.png"> 
+<strong>Warning!</strong> <strong>Do not ARP Poison any control interface (192.168.x.x)! Check which interface on attacker node has 10.x.x.x address and use that interface with -i option with ettercap, to make sure your poisoning stays on experimental network.</strong> 
+</p></div> 
+
+<p />
+<span class="anchor" id="eavetasks"></span> 
+<h4>Eavesdropping Tasks</h4>
+
+<p />
+Answer these questions as completely as you can: 
+
+<ol>
+<li>What kind of data is being transmitted in cleartext? 
+	<ul>
+	<li>What ports, what protocols? 
+	</li><li>Can you extract identify any meaningful information from the data? 
+	</li><li>e.g., if a telnet session is active, what is happening in the sesion? If a file is being transferred, can you identify the data in the file? 
+	</li><li>Make sure you eavesdrop for at least 30 seconds to make sure you get a representative sample of the communication. 
+	</li>
+	</ul></li>
+<li>Is any authentication information being sent over the wire? e.g., usernames and passwords. 
+	<ul>
+	<li>If so, what are they? What usernames and passwords can you discover? 
+</li><li><p />
+	<strong>Note:</strong> the username and password decoding in ettercap is not perfect -- how else could you view plain text authentication? 
+</li>
+	</ul></li>
+<li>Is any communication encrypted? What ports? 
+</li>
+</ol>
+
+<p />
+<span class="anchor" id="replayassign"></span> 
+<h3>2. Replay Attack against the Stock Ticker</h3>
+
+
+<p />
+You know that stock information is communicated over your network and logged on an internal server. It takes a feed from New York that updates the current price. The local server shows the current price and all previous prices since the last reload. This local server is the information that all internal company brass use for their reports and personal stock purchases. You also know that the stock program uses some kind of encryption, but you think it may be vulnerable to replay attacks because it was written by the CTO's 13 year old nephew who doesn't have the greatest security track record. 
+
+<p />
+Can you perform a replay attack against the stock ticker in order to make FrobozzCo's stock look bad and Zembor Corp's stock look good? You like imagining the internal chaos this would cause. 
+
+<p />
+To do this, you will need to: 
+
+<ul><li>set up ARP spoofing with Ettercap 
+</li><li><p />
+capture traffic with <tt>tcpdump</tt> 
+</li><li>analyze the captured traffic 
+</li><li>generate new requests to the stock quote service by "replaying" old requests. 
+</li></ul><p />
+
+You will probably find it easiest to create URL-based replay attacks using elinks, wget, or curl (all text-based web clients). Likewise, you'll probably want to <a href="http://docs.deterlab.net/core/DETERSSH/#ssh-port-forwarding">set up port forwarding</a> so you can play with the application in your desktop web browser. 
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+In this way, you are "replaying" the remote procedure call (RPC), but not the actual TCP packets. In reality, there is software that can be used to actually replay real TCP sessions back on to the network, but it is too complicated for this lab. (What about TCP packets makes replaying difficult?) 
+</div>
+
+<p />
+
+<span class="anchor" id="replaytasks"></span> 
+<h4>Replay Tasks</h4>
+
+<p />
+Once you figure out how to create the replay attack, include the following information in a report: 
+
+<ol><li>Explain exactly how to execute the attack, including the specific RPCs you replayed. 
+</li><li>Explain how you determined that this strategy would work. 
+</li><li>Execute your replay attack and show the results of your attack with a screen capture, text dump, etc. showing that you are controlling the prices on the stock ticker. 
+</li></ol><p />
+
+<span class="anchor" id="insertassign"></span> 
+<h3>3. Insertion Attack</h3>
+
+<p />
+Ettercap has the ability to execute <a class="http" href="http://en.wikipedia.org/wiki/Regular_expression">regular expression</a>-like filters  on cleartext traffic. This allows you to change the contents of packets as you sniff them. To do this, you need to create ettercap filter modules and load them into a running ettercap that is performing ARP spoofing. 
+
+<p />
+For this part of the lab, you'll write some etterfilters, compile them, and load them into ettercap so you can use them on the network stream. 
+
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+etterfilters can be used to intercept and change traffic in either or both directions, but only between <tt>bob</tt> and <tt>alice</tt>. This means that you can change a request going to the server, and/or you can change the results that ticker users <em>see</em> when they view the ticker (by changing outgoing results). However, changing requests <em>to</em> the server is hard because of the nonce in the stock ticker request. This nonce hinders replay attacks and thus makes it difficult to correctly modify requests that are <em>inbound</em> to the ticker. However, but since the ticker replies in cleartext, it's easy to change outgoing results! Again, remember that requests from <tt>eve</tt> will not be modified -- so "testing" from <tt>eve</tt> with <tt>elinks</tt> or a tunneled connection will not see the changes. 
+</div>
+
+ 
+
+<p />
+
+<span class="anchor" id="inserttasks"></span> 
+<h4>Insertion Tasks</h4>
+
+<p />
+For these filters, you won't change the data that's on the stock server -- just what it looks like to someone viewing the page.  
+
+<ol>
+<li>You can change the symbols a viewer of the ticker sees by intercepting the HTML bound for their browser. Write a filter to change the symbol FZCO to OWND. 
+</li><li><p />
+Write a filter to affect the <em>prices</em> a user of the stock ticker sees. 
+</li><li>Include your filter sources with your submission materials. 
+	<ul>
+	<li><p />Make sure you comment your code (use the <tt>#</tt> character) to explain what the filter does and how. 
+	</li>
+	</ul></li>
+</ol><p />
+
+
+<div class="warning">
+<p />
+<img src="alert.png" />
+
+<strong>Warning!</strong> It's hard to test whether your filtering setup is working, because <tt>ettercap</tt> is only filtering traffic to and from <tt>alice</tt> and <tt>bob</tt>. If you run <tt>elinks</tt> on <tt>eve</tt>, or forward a port through <tt>eve</tt> with ssh tunneling, the traffic you see as a viewer will not be modified! You <em>can</em> run <tt>tcpdump</tt> on <tt>eve</tt> to see the modified packets leaving <tt>eve</tt>, but only the outgoing packets will be modified. 
+
+</div>
+ 
+
+<p />
+For these questions, you don't need to write filters, just write short answers or pseudocode explaining how you would do it. 
+
+<ol>
+<li>Given the power of etterfilter and the kinds of traffic on this network, you can actually make significant changes to a machine or machines that you're not even logged in to. How? 
+</li><li>Of the cleartext protocols in use, can you perform any other dirty tricks using insertion attacks? The more nasty and clever they are, the better. 
+</li>
+</ol>
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+Hint: There is a sample etterfilter source file in <tt>/root/</tt> on the host <tt>eve</tt>. You can use this filter as a starting point for your own filters. See <tt>man&nbsp;etterfilter</tt> and irongeek's etterfilter tutorial in the "starting points" section below. 
+</div>
+
+
+<p />
+<span class="anchor" id="mitmassign"></span> 
+<h3>4. MITM vs. Encryption</h3>
+
+<p />
+There is at least one encrypted network stream in use on your network subnet. Lucky for you, your coworkers blindly click OK any time a certificate error pops up on their screen -- you know this because they complain loudly every time it happens -- so you are hopeful that a man-in-the-middle attack against the certificates would be successful. What's so important about that encrypted stream -- what is the data being transferred? 
+
+<div class="infobox">
+<p />
+<img src="idea.png" />
+
+Ettercap will not perform SSL decryption automatically -- you have to uncomment a few configuration items in <tt>/usr/local/etc/etter.conf</tt> in order to properly forward the data. Examine that file, use any available documentation and make the necessary changes so that you  can man-in-the-middle their SSL connection. 
+
+<p />
+When you quit using Ettercap after having made these changes, it will make some complaints -- don't worry about them. 
+
+</div>
+
+<p />
+
+<span class="anchor" id="mitmtasks"></span> 
+<h4>MITM Tasks</h4>
+
+<ol>
+<li>What configuration elements did you have to change? 
+</li><li>Copy and paste some of this data into a text file and include it in your submission materials. 
+</li><li>Why doesn't it work to use <tt>tcpdump</tt> to capture this "decrypted" data? 
+</li><li>For this exploit to work, it is necessary for users to blindly "click OK" without investigating the certificate issues. Why is this necessary? 
+</li><li>What is the encrypted data they're hiding? 
+</li></ol>
+
+
+
+
+</div>
+<span class="anchor" id="glitches"></span>
+
+<div class="level3">
+<h3>What can go wrong</h3>
+
+<p />Specific problems:
+
+<ul>
+<li>Make sure you swap out your nodes when you are done working.</li>
+<li>If Ettercap doesn't seem to be working, make sure you are poisoning the correct interface. You should be poisoning the 10.x.x.x interface.</li>
+<li>If Ettercap still won't work, try rebooting your nodes (you don't have to swap out yet).</li>
+<li>If it's still not working, try swapping the nodes out and back in. (Save your work.)</li>
+<li>Keep your etterfilters simple -- the etterfilter scripting language can be difficult to work with.</li>
+<li>Remember that ettercap is experimental software and will sometimes crash. Don't take it personally.</li>
+</ul>
+
+<p />Other tips:
+
+<p />
+This assignment is left intentionally open-ended -- rather than going into great depth about how to use tools like Ettercap, tcpdump, chaosreader, and others, we're leaving it up to <em>you</em> to do the external reading and experimentation required. We've also provided a <a href="#extra">challenge problem</a> if the regular assignment is too easy.
+
+<p />
+You should take notes on everything that you do, including taking terminal logs or copying character data from the terminal. In a very real sense, this activity is the opposite of computer forensics, and both require lots of notes in order to ensure repeatability. In a real Red Team exercise, complete and thorough documentation is a must. 
+
+<p />
+A few starting points: 
+
+<ul>
+<li><p /><a class="http" href="https://www.sans.org/reading-room/whitepapers/tools/ettercap-primer-1406">SANS Institute Ettercap Tutorial</a> -- this is for an older version of Ettercap so don't be confused. 
+</li><li><p />
+<a class="http" href="http://ettercap.sourceforge.net">Ettercap Homepage</a> 
+</li>
+<li><p />
+<a class="http" href="http://www.irongeek.com/i.php?page=security/ettercapfilter">etterfilter tutorial</a> 
+</li></ul><p />
+Good luck! 
+
+
+</div>
+<span class="anchor" id="extra"></span> 
+<h2>Extra Credit</h2>
+
+<p />You have a <em>powerful suspicion</em> that the encryption token used in the stock ticker application is not particularly strong. 
+
+<p />
+
+<h3>Extra Credit Questions</h3>
+
+<p />Answer one or more of the following to receive extra credit points.
+
+<ol>
+<li><p />What <em>observable software behavior</em> might lead you to believe this?</li>
+<li>Can you reverse engineer the token? How is the token created?</li>
+<li>If you can reverse engineer it, can you write a script in your favorite language to post data of your choice?
+	<ul>
+	<li>Hint: all the necessary pieces are available on the servers for both Perl and bash.</li>
+	</ul></li>
+<li>What would be a better token? How would you implement it on both the client and server side? 
+</li></ol><p />
+
+
+<span class="anchor" id="submission"></span> 
+<h2>Submission Instructions</h2>
+
+<p />
+Create a single .pdf, .doc, or .txt with all your answers, your etterfilter source files, and anything else you think should be included etc., and submit it to your instructor. Make sure to double check that you have answered all the questions. 
+
+</div>
+</body></html>
+

@@ -1,0 +1,192 @@
+#!/bin/bash
+
+
+function CheckStamp
+{
+
+# Check to see if the installer has already completed for this 
+# particular machine. If so, run the PostInstall function 
+# (defined in the parent script) and allow logins.
+
+
+	if [ -e /var/236stamp/complete ]; then
+		echo "The installer has already been successfully run, calling PostInstall and exiting."
+		PostInstall # from other script
+		YesLogin
+		exit 0;
+	fi
+}
+
+function CreateStamp
+{
+
+# Creates a stamp and directory /var/236stamp/complete,
+# which indicates that the installer has completed successfully.
+
+	mkdir -p /var/236stamp/
+	DATE=`date`
+	STAT="----\n$DATE\nConfiguration complete.\n----\n"
+	echo -e $STAT > /var/236stamp/complete
+}
+
+
+
+function NoLogin
+{
+
+# Creates an /etc/nologin file with a message for users
+# trying to log in. This file is removed by YesLogin.
+
+	cat <<- EOF > /etc/nologin
+
+	***************************************************************************
+	*    This node is still being configured -- try again in a few minutes    *
+	***************************************************************************
+	
+	While your experimental nodes have been swapped in, the exercise 
+	environment is still being configured. If this message persists for more
+	than 15 minutes, please email your instructor or TA.
+
+	EOF
+}
+
+function YesLogin
+{
+
+# Removes the /etc/nologin file created by NoLogin.
+	
+	if [ -f /etc/nologin ]
+	then
+		rm /etc/nologin
+	else
+		echo "/etc/nologin not set. not deleting."
+	fi
+}
+	
+function IfExistDelete
+{
+
+# Deletes the specified file, if it exists. It complains it if does 
+# not exist.
+
+	if [ -e $1 ]; then 
+		rm $1
+	else 
+		echo "File '$1' does not exist."
+#		exit 1
+	fi
+}
+
+function IfExistArg
+{
+
+# If the named script exists, then it is called with the rest of the
+# arguments. Otherwise prints error.
+
+	if [ -e $1 ]; then 
+		$@;
+	else
+		echo "(Script '$1' does not exist or is not executable -- can't exec.)"
+#		exit 1
+	fi
+}
+
+function IfDirDelete
+{
+
+# Deletes a subtree if it exists or prints error.
+
+	if [ -d $1 ]; then 
+		rm -rf $1
+	else
+		echo "(Directory '$1' does not exist -- can't delete.)"
+#		exit 1
+	fi
+}
+
+function IfExistLinkDelete
+{
+
+# Deletes a symlink if it exists, otherwise prints error.
+
+	if [ -L $1 ]; then 
+		rm $1
+	elif ! [ -e $1 ]; then
+		echo "File '$1' does not exist."
+#		exit 1
+	else
+		echo "File exists but is not a link."
+#		exit 1
+	fi
+}
+
+function IfExistCopyTo
+{
+
+# Copies a file to a destination if it exists or prints error.
+
+	if [ -f $1 ];
+	then 
+		cp $1 $2
+	else 
+		echo "File '$1' does not exist..."
+#		exit;
+	fi
+}
+
+function DoOrDie
+{
+
+# Sleeps 1 second, then attempts to execute argument $1. If that fails,
+# print an error message and exit.
+	sleep 1
+	if ! $1; then
+		echo "Problem installing '$1'."
+		exit 1
+	fi
+}
+
+function StripUserPasswords
+{
+
+# Remove unwanted users from user file.
+
+# DETER includes everyone in the group in the passwd file, which we don't
+# want. So we should remove everyone who is not in the root group, which 
+# includes root, toor, admins, and the student.
+
+# First, we echo the names of everyone in the root group. 
+
+# Then, we echo every line from the input file which is associated with
+# a UID below 100 -- which are system accounts only.
+
+# then, we sort that by UID and return only unique lines just to be
+# sure. This is outputted to the caller. (Probably RemoveUserPasswords.)
+
+	(
+		grep '^root:' /etc/group |
+		cut -d: -f4 |
+		echo "^($(sed 's/,/|/g')):" |
+		egrep -f- $1;
+		awk -F: '{if ($3 <= 100) print "^" $1 ":"}' /etc/passwd | grep -f- $1
+	) | sort -t: -k 3 -n | uniq
+}
+
+function RemoveUserPasswords
+{
+
+# This uses StripUserPasswords to remove unwanted user accounts from passwd
+# and shadow.
+
+# The script calls StripUserPasswords with the file to strip, and puts the
+# output in a temporary file. Then it replaces the original with the 
+# modified version.
+
+	StripUserPasswords /etc/passwd > /etc/passwd.new
+	StripUserPasswords /etc/shadow > /etc/shadow.new
+	mv -f /etc/passwd{.new,}
+	mv -f /etc/shadow{.new,}
+	chown root:root /etc/passwd /etc/shadow
+	chmod 644 /etc/passwd
+	chmod 400 /etc/shadow
+}

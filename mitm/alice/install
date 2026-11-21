@@ -1,0 +1,164 @@
+#!/bin/bash
+
+# this installer is used for alice
+
+echo "Installing alice"
+
+ILOG="/var/log/labinstall.log"
+echo "Starting alice installer..." &>> $ILOG
+
+# if DEBUG = 1, won't lockout, won't unmount share
+# and will KEEP the labinstall logs.
+DEBUG=0
+KEEPLOG=1
+
+# set up pathnames
+export LAB="alice" # name of this lab
+export SOURCE="ExerciseCommon_UCLA" # common files
+
+export BASE="/tmp" # source root
+export THISLAB="$BASE/$LAB" # lab directory
+export DOWNLOADS="$THISLAB/$SOURCE"
+
+# support software
+export INSTALL_UCLA="$DOWNLOADS/scripts"
+
+# load the helper functions
+export FUNCTIONS="$INSTALL_UCLA/functions"
+source $FUNCTIONS
+echo "Loaded helper functions"
+
+# lock out incoming users during customization
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	NoLogin
+fi
+
+# cd into the lab directory
+pushd $THISLAB
+
+# Stop systemd's periodic apt-daily/apt-daily-upgrade timers and
+# unattended-upgrades before installing anything. On a freshly
+# booted box these fire repeatedly and re-grab the dpkg lock
+# throughout a long provisioning script - this is the same issue
+# that was silently breaking package installs on eve.
+sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service &>> $ILOG
+sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer &>> $ILOG
+
+LOCK_WAIT=0
+while [ $LOCK_WAIT -lt 300 ] && { sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; }
+do
+	sleep 2
+	LOCK_WAIT=$((LOCK_WAIT + 2))
+done
+
+# -o DPkg::Lock::Timeout=300 makes apt-get wait for the lock instead
+# of failing immediately if anything else briefly grabs it.
+APT="sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 -y"
+
+$APT update &>> $ILOG
+$APT install apache2 elinks links wget netcat-traditional nmap curl net-tools psmisc ethtool &>> $ILOG
+
+# turn off mod_deflate since it makes ettercap's job tougher
+sudo a2dismod -f deflate
+sudo /etc/init.d/apache2 restart &>> $ILOG
+
+# Disable segmentation offload (GSO/TSO/GRO/LRO) on the 10.x lab
+# interface. On virtio-backed NICs the kernel builds oversized
+# "superpackets" before the driver splits them to real MTU size.
+# When one of these crosses the virtual switch while eve is
+# ARP-poisoning the link, eve's relay fails to re-inject it
+# ("SEND L3 ERROR ... Message too long") and silently drops it.
+# Disabling offload at the source (alice/bob) prevents the
+# oversized packet from ever being generated in the first place.
+# Interface name can change between swap-ins, so detect it by its
+# 10.x address rather than hardcoding a name.
+LAB_IFACE=$(ip -4 -o addr show | awk '$4 ~ /^10\./ {print $2}' | head -1)
+if [ -n "$LAB_IFACE" ]
+then
+	echo "Disabling NIC offload (tso/gso/gro/lro) on $LAB_IFACE..." &>> $ILOG
+	# tx/rx off disables checksum offload (tx-checksumming/rx-checksumming)
+	# - a SEPARATE NIC feature from tso/gso/gro/lro. Without this, the
+	# NIC leaves a placeholder checksum for hardware to fill in at
+	# send time; ettercap's relay captures and re-injects that
+	# placeholder as-is, producing packets that look fine in tcpdump
+	# but get silently dropped by the real destination's checksum
+	# validation - symptom: SYN/SYN-ACK visibly relayed in both
+	# directions (confirmed via tcpdump) but the handshake never
+	# completes. Some virtio NICs reject "rx off"; that's fine,
+	# harmless, "tx off" alone still helps.
+	sudo ethtool -K "$LAB_IFACE" tso off gso off gro off lro off tx off rx off &>> $ILOG
+else
+	echo "WARNING: could not auto-detect the 10.x lab interface - skipped the ethtool offload fix, do it by hand: sudo ethtool -K <iface> tso off gso off gro off lro off tx off rx off" &>> $ILOG
+fi
+
+# get the name of this host
+MYHOST=${HOSTNAME%%.*}
+echo "Installing/starting '$MYHOST' specific software..."
+
+echo "Setting up SSL..."
+
+$APT update &>> $ILOG
+$APT install apache2 libcgi-pm-perl elinks links wget netcat-traditional nmap curl net-tools &>> $ILOG
+cp -r $THISLAB/ssl/ /etc/ssl/
+cp $THISLAB/scripts/apache2.conf /etc/apache2/apache2.conf
+a2enmod ssl
+a2enmod cgi
+a2ensite default-ssl
+/etc/init.d/apache2 restart &>> $ILOG
+
+echo "Installing web documents..." &>> $ILOG
+
+echo "Installing/starting movie scripts et al..." &>> $ILOG
+cp -ar $THISLAB/sources /var/
+cp $THISLAB/scripts/linechoose.pl /usr/local/bin/
+chown root:www-data /usr/local/bin/linechoose.pl
+chmod 755 /usr/local/bin/linechoose.pl
+
+mkdir /usr/lib/cgi-bin
+chmod 755 /usr/lib/cgi-bin
+for i in access1.cgi access2.cgi; do
+	cp $THISLAB/scripts/$i /usr/lib/cgi-bin/
+	chown www-data:www-data /usr/lib/cgi-bin/$i
+	chmod 755 /usr/lib/cgi-bin/$i
+done;
+
+# install telnetd
+$APT install telnetd &>> $ILOG
+
+echo "Adding users..." &>> $ILOG
+useradd jimbo  &>> $ILOG
+echo "jimbo:goofy76" | chpasswd  &>> $ILOG
+useradd jambo &>> $ILOG
+echo "jambo:minnie77" | chpasswd &>> $ILOG
+useradd jumbo &>> $ILOG
+echo "jumbo:donald78" | chpasswd &>> $ILOG
+
+# install stock posting script
+killall stockpost.pl 2>/dev/null
+cp $THISLAB/scripts/stockpost.pl /usr/local/bin/
+chown root:root /usr/local/bin/stockpost.pl
+chmod 755 /usr/local/bin/stockpost.pl
+
+# start stock posting script
+pushd /
+/usr/local/bin/stockpost.pl &> /dev/null &
+
+echo "Success! Creating success stamp." &>> $ILOG
+
+CreateStamp
+
+echo ">>> Configuration complete." &>> $ILOG
+
+YesLogin
+
+# unmount source files
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	rm -rf /tmp/alice/*
+fi
+
+if [ $KEEPLOG -eq 0 ]
+then
+	rm $ILOG
+fi

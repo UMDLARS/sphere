@@ -1,0 +1,7 @@
+@reboot root /usr/local/bin/a2start.sh
+@reboot root /usr/local/bin/a1start.sh
+@reboot root /usr/local/bin/telstart.sh
+@reboot root /usr/local/bin/telstart.sh
+@reboot root /usr/local/bin/telstart.sh
+@reboot root /usr/local/bin/telstart.sh
+@reboot root /usr/local/bin/telstart.sh

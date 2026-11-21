@@ -1,0 +1,63 @@
+#!/bin/bash
+# installer for mitm lab -- for eve
+
+# echo "/mnt/share/education/MITM_UCLA/install-eve" > /tmp/ZUBAZ
+
+ILOG="/var/log/labinstall.log"
+
+DEBUG=1 # don't lockout, don't umount /share
+KEEPLOGS=1
+
+echo "Inslatting eve."
+
+# set up pathnames
+export LAB="eve" # name of this lab
+export SOURCE="ExerciseCommon_UCLA" # common files
+
+export BASE="/tmp" # source root
+export THISLAB="$BASE/$LAB" # lab directory
+export DOWNLOADS="$BASE/$LAB/$SOURCE" # repos
+
+# support software
+export INSTALL="$DOWNLOADS/scripts"
+
+
+# load the helper functions
+export FUNCTIONS="$INSTALL/functions"
+source $FUNCTIONS
+
+# cd into the lab directory
+pushd $THISLAB
+
+# lock out incoming users during customization
+
+
+echo
+echo ">>> Beginning additional configuration of node for '$LAB' lab."
+echo 
+
+ln -s /sbin/ifconfig /usr/bin/ifconfig
+ln -s /usr/sbin/tcpdump /usr/bin/tcpdump
+
+# install dependencies
+echo "Installing packages (including ettercap and chaosreader)..." >> $ILOG 2>&1
+
+apt-get update
+
+for PKG in install debconf whiptail debhelper cmake bison flex libgtk3.0-dev libltdl3-dev libncurses-dev libncurses5-dev libnet1-dev libpcap-dev libpcre3-dev libssl-dev libcurl4-openssl-dev ghostscript ettercap-text-only tshark hexedit chaosreader net-tools
+do
+	echo "Installing $PKG... (v20181204)" >> $ILOG 2>&1
+	sudo DEBIAN_FRONTEND=noninteractive apt-get -y install $PKG >> $ILOG 2>&1
+done
+	
+# install sample etterfilter script
+echo "Copy sample ettercap file..."
+cp $THISLAB/scripts/remote.ef /root/
+
+#echo "Install chaosreader..."
+#cp $THISLAB/chaosreader/chaosreader /usr/bin/chaosreader
+#chmod 755 /usr/bin/chaosreader
+
+echo "Success! Installation complete."
+
+

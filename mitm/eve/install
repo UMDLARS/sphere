@@ -1,0 +1,163 @@
+#!/bin/bash
+# installer for mitm lab -- for eve
+
+ILOG="/var/log/labinstall.log"
+
+DEBUG=1
+KEEPLOGS=1
+
+echo "Installing eve."
+
+# set up pathnames
+export LAB="eve" # name of this lab
+export SOURCE="ExerciseCommon_UCLA" # common files
+
+export BASE="/tmp" # source root
+export THISLAB="$BASE/$LAB" # lab directory
+export DOWNLOADS="$BASE/$LAB/$SOURCE" # repos
+
+# support software
+export INSTALL="$DOWNLOADS/scripts"
+
+# load the helper functions
+export FUNCTIONS="$INSTALL/functions"
+source $FUNCTIONS
+
+# lock out incoming users during customization (same convention as
+# install_alice / install_bob). With DEBUG=1 (the current setting)
+# this is skipped, same as the other two scripts.
+if [ $DEBUG -eq 0 ]
+then
+	NoLogin
+fi
+
+# cd into the lab directory
+pushd $THISLAB
+
+echo
+echo ">>> Beginning additional configuration of node for '$LAB' lab."
+echo 
+
+# install dependencies
+echo "Installing packages (including tcpdump and chaosreader)..." >> $ILOG 2>&1
+
+# Stop systemd's periodic apt-daily/apt-daily-upgrade timers and
+# unattended-upgrades for the rest of this run. On a freshly booted
+# box these fire repeatedly and re-grab the dpkg lock throughout a
+# long provisioning script, which -o DPkg::Lock::Timeout alone can't
+# fully compensate for since the lock holder keeps changing.
+sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service >> $ILOG 2>&1
+sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >> $ILOG 2>&1
+
+# Wait for anything already holding the lock at boot to finish before
+# we start, rather than racing it from the first apt-get call. Capped
+# at 5 minutes so a persistent holder can't hang the script here
+# forever - -o DPkg::Lock::Timeout below still covers it from there.
+LOCK_WAIT=0
+while [ $LOCK_WAIT -lt 300 ] && { sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; }
+do
+	sleep 2
+	LOCK_WAIT=$((LOCK_WAIT + 2))
+done
+
+# -o DPkg::Lock::Timeout=300 is kept as a safety net for anything else
+# that might still briefly grab the lock (e.g. a manual apt run).
+APT="sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 -y"
+
+$APT update >> $ILOG 2>&1
+
+for PKG in debconf whiptail debhelper cmake bison flex libgtk3.0-dev libltdl3-dev libncurses-dev libncurses5-dev libnet1-dev libpcap-dev libssl-dev libcurl4-openssl-dev ghostscript tcpdump tshark hexedit chaosreader net-tools ethtool
+do
+	echo "Installing $PKG... (v20181204)" >> $ILOG 2>&1
+	$APT install $PKG >> $ILOG 2>&1
+done
+
+# these rely on net-tools (ifconfig) and tcpdump being installed above,
+# so the symlinks must come AFTER the install loop, not before it
+ln -sf /sbin/ifconfig /usr/bin/ifconfig
+
+# dpkg can mark tcpdump "installed" without the actual binary ever
+# landing on disk (seen on this testbed - likely the same dpkg-lock
+# contention guarded against above, slipping through once). A plain
+# `ln -sf` doesn't check its target exists, so verify the real binary
+# is actually there first and force a reinstall if not, rather than
+# silently symlinking to nothing.
+if [ ! -f /usr/sbin/tcpdump ]
+then
+	echo "tcpdump binary missing despite dpkg believing it's installed - forcing reinstall..." >> $ILOG 2>&1
+	$APT install --reinstall tcpdump >> $ILOG 2>&1
+fi
+
+if [ -f /usr/sbin/tcpdump ]
+then
+	ln -sf /usr/sbin/tcpdump /usr/bin/tcpdump
+else
+	echo "ERROR: tcpdump still missing after reinstall attempt - see $ILOG" | tee -a $ILOG
+fi
+
+# Disable segmentation offload (GSO/TSO/GRO/LRO) on the 10.x lab
+# interface. On virtio-backed NICs the kernel builds oversized
+# "superpackets" that libpcap captures before the NIC driver splits
+# them to real MTU size. When ettercap's ARP-MITM engine tries to
+# re-inject one of those captured packets toward its real
+# destination, libnet's raw IP write rejects anything over the
+# interface MTU, producing errors like:
+#   SEND L3 ERROR: NNNN byte packet ... was not forwarded
+#   (libnet_write_raw_ipv4(): -1 bytes written (Message too long))
+# and silently dropping that packet instead of relaying it. Turning
+# offload off forces real MTU-sized packets before pcap ever sees
+# them. The interface name (ethN/ensN) can change between swap-ins
+# (per the lab manual), so detect it by its 10.x address rather than
+# hardcoding a name.
+LAB_IFACE=$(ip -4 -o addr show | awk '$4 ~ /^10\./ {print $2}' | head -1)
+
+if [ -n "$LAB_IFACE" ]
+then
+	echo "Disabling NIC offload (tso/gso/gro/lro) on $LAB_IFACE..." >> $ILOG 2>&1
+	# tx/rx off disables checksum offload (tx-checksumming/rx-checksumming)
+	# - a SEPARATE NIC feature from tso/gso/gro/lro. Without this, the
+	# NIC leaves a placeholder checksum for hardware to fill in at
+	# send time; ettercap's relay captures and re-injects that
+	# placeholder as-is, producing packets that look fine in tcpdump
+	# but get silently dropped by the real destination's checksum
+	# validation - symptom: SYN/SYN-ACK visibly relayed in both
+	# directions (confirmed via tcpdump) but the handshake never
+	# completes. Some virtio NICs reject "rx off"; that's fine,
+	# harmless, "tx off" alone still helps.
+	sudo ethtool -K "$LAB_IFACE" tso off gso off gro off lro off tx off rx off >> $ILOG 2>&1
+else
+	echo "WARNING: could not auto-detect the 10.x lab interface - skipped the ethtool offload fix, do it by hand: sudo ethtool -K <iface> tso off gso off gro off lro off tx off rx off" | tee -a $ILOG
+fi
+
+# NOTE: ettercap itself is intentionally NOT built here. It's built
+# from source via the standalone install_ettercap.sh, run by hand on
+# eve after this script, right before taking the OS image. That build
+# (git clone + PCRE1-from-source + cmake/make) is slow enough that
+# running it inside this swap-in script made it look frozen.
+
+# install sample etterfilter script
+echo "Copy sample ettercap file..."
+cp $THISLAB/scripts/remote.ef /root/
+
+# Getting the ettercap installation script over.
+chmod a+x $THISLAB/scripts/install-ettercap.sh
+cp /tmp/install-ettercap.sh /home/umdclass*
+
+echo "Success! Installation complete." >> $ILOG 2>&1
+
+CreateStamp
+
+echo ">>> Configuration complete." >> $ILOG 2>&1
+
+YesLogin
+
+# unmount source files
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	rm -rf /tmp/eve/*
+fi
+
+if [ $KEEPLOGS -eq 0 ]
+then
+	rm $ILOG
+fi

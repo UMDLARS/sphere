@@ -1,0 +1,9 @@
+from mergexp import *
+net = Network('mitm', addressing==ipv4, routing==static)
+alice,bob,eve = [net.node(name) for name in [ 'alice', 'bob', 'eve' ]]
+
+# Create a link connecting the two nodes.
+link = net.connect([alice,bob,eve])
+
+# Making the experiment runnable.
+experiment(net)

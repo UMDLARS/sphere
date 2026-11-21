@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+DMO=$( sudo dmesg | grep -i virtual &> /tmp/dmesg-grep.out ) 
+DMID=$( sudo dmidecode -s system-product-name &> /tmp/dmidecode.out )
+
+# does /etc/motd mention Ubuntu?
+UBUNTU=$( grep -Eo "Ubuntu [[:digit:].]+" /etc/motd )
+
+if grep "Ubuntu" <<< $UBUNTU &> /dev/null
+then
+	UBUNTU=$( sed -r 's/ /_/g' <<< $UBUNTU )
+	OS=$UBUNTU
+else
+	# OS may be CentOS?
+	OS=$( sed -r 's/ /_/g' < /etc/redhat-release)
+fi
+
+# install virt-what to detect machine type
+
+if ! which virt-what &> /dev/null
+then
+	echo "Installing virt-what to detect machine type..." 2>&1
+	if grep -i ubuntu <<< $OS > /dev/null
+	then
+
+		sudo apt-get install -y virt-what > /dev/null
+
+	elif grep -i centos <<< $OS > /dev/null
+	then
+		
+		sudo yum install -y virt-what > /dev/null
+
+	else
+		echo "Don't recognize the OS type. Quitting."
+		exit 1
+	fi
+fi
+
+NODE=$( sudo virt-what )
+if [[ -z $NODE ]]
+then
+	NODE="pnode"
+fi
+
+BITS=""
+
+UNAME=$(uname -a)
+
+if grep -E "i[36]86" <<< $UNAME &> /dev/null
+then
+	BITS="32-bit"
+elif grep -E "x86_64" <<< $UNAME &> /dev/null
+then
+	BITS="64-bit"
+else
+	BITS="?-bit"
+fi
+
+echo "$NODE $OS $BITS"
+

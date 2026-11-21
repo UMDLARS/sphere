@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# this script unmounts the installation media and other 
+# project information (in /proj) for the labs.
+#
+# It does this by creating a self-deleting script under 
+# tmp, named $UC, and executing it
+
+SHARE=$( df -h | awk '/proj/ { print $NF }' ) # get class-agnostic mount point
+UC="/tmp/umountproj"
+ERR="/tmp/ump-output"
+
+cd /tmp
+
+echo "#!/bin/bash" > $UC
+echo "sleep 3" >> $UC
+echo "sudo umount $SHARE &> $ERR" >> $UC
+echo "if [ ! -s $ERR ]" >> $UC
+echo "then" >> $UC
+echo "	rm $ERR" >> $UC
+echo "fi" >> $UC
+echo "rm $UC" >> $UC
+
+chmod ugo+rx $UC
+
+$UC &

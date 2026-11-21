@@ -1,0 +1,164 @@
+#!/bin/bash
+
+# this installer is used for bob
+
+echo "Installing bob"
+
+ILOG="/var/log/labinstall.log"
+
+DEBUG=0
+KEEPLOG=1
+
+# set up pathnames
+export LAB="bob" # name of this lab
+export SOURCE="ExerciseCommon_UCLA" # common files
+
+export BASE="/tmp" # source root
+export THISLAB="$BASE/$LAB" # lab directory
+export DOWNLOADS="$THISLAB/$SOURCE"
+
+# support software
+export INSTALL_UCLA="$DOWNLOADS/scripts"
+
+# load the helper functions
+export FUNCTIONS="$INSTALL_UCLA/functions"
+source $FUNCTIONS
+echo "Loaded helper functions"
+echo $FUNCTIONS
+
+# lock out incoming users during customization
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	NoLogin
+fi
+
+# cd into the lab directory
+pushd $THISLAB
+
+# Stop systemd's periodic apt-daily/apt-daily-upgrade timers and
+# unattended-upgrades before installing anything. On a freshly
+# booted box these fire repeatedly and re-grab the dpkg lock
+# throughout a long provisioning script - this is the same issue
+# that was silently breaking package installs on eve.
+sudo systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service &>> $ILOG
+sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer &>> $ILOG
+
+LOCK_WAIT=0
+while [ $LOCK_WAIT -lt 300 ] && { sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; }
+do
+	sleep 2
+	LOCK_WAIT=$((LOCK_WAIT + 2))
+done
+
+# -o DPkg::Lock::Timeout=300 makes apt-get wait for the lock instead
+# of failing immediately if anything else briefly grabs it.
+APT="sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 -y"
+
+$APT update &>> $ILOG
+$APT install apache2 elinks links wget netcat-traditional nmap curl net-tools ethtool &>> $ILOG
+
+# turn off mod_deflate since it makes ettercap's job tougher
+sudo a2dismod -f deflate
+sudo /etc/init.d/apache2 restart &>> $ILOG
+
+# Disable segmentation offload (GSO/TSO/GRO/LRO) on the 10.x lab
+# interface. On virtio-backed NICs the kernel builds oversized
+# "superpackets" before the driver splits them to real MTU size.
+# When one of these crosses the virtual switch while eve is
+# ARP-poisoning the link, eve's relay fails to re-inject it
+# ("SEND L3 ERROR ... Message too long") and silently drops it.
+# Disabling offload at the source (alice/bob) prevents the
+# oversized packet from ever being generated in the first place.
+# Interface name can change between swap-ins, so detect it by its
+# 10.x address rather than hardcoding a name.
+LAB_IFACE=$(ip -4 -o addr show | awk '$4 ~ /^10\./ {print $2}' | head -1)
+if [ -n "$LAB_IFACE" ]
+then
+	echo "Disabling NIC offload (tso/gso/gro/lro) on $LAB_IFACE..." &>> $ILOG
+	# tx/rx off disables checksum offload (tx-checksumming/rx-checksumming)
+	# - a SEPARATE NIC feature from tso/gso/gro/lro. Without this, the
+	# NIC leaves a placeholder checksum for hardware to fill in at
+	# send time; ettercap's relay captures and re-injects that
+	# placeholder as-is, producing packets that look fine in tcpdump
+	# but get silently dropped by the real destination's checksum
+	# validation - symptom: SYN/SYN-ACK visibly relayed in both
+	# directions (confirmed via tcpdump) but the handshake never
+	# completes. Some virtio NICs reject "rx off"; that's fine,
+	# harmless, "tx off" alone still helps.
+	sudo ethtool -K "$LAB_IFACE" tso off gso off gro off lro off tx off rx off &>> $ILOG
+else
+	echo "WARNING: could not auto-detect the 10.x lab interface - skipped the ethtool offload fix, do it by hand: sudo ethtool -K <iface> tso off gso off gro off lro off tx off rx off" &>> $ILOG
+fi
+
+echo "Installing/starting bob specific software..."
+
+echo "Copying scripts..." &>> $ILOG
+
+$APT install apache2 libcgi-pm-perl elinks links wget netcat-traditional nmap curl psmisc &>> $ILOG
+cp $THISLAB/scripts/apache2.conf /etc/apache2/apache2.conf
+a2enmod cgi
+service apache2 restart
+
+# copy and start the movie reader scripts
+pushd /usr/local/bin
+for i in a2start.sh a1start.sh; do
+	killall $i 2>/dev/null
+	cp $THISLAB/scripts/$i /usr/local/bin/
+	sudo chmod 755 /usr/local/bin/$i
+	# start the scripts
+	./$i &> /dev/null &
+done
+popd
+
+# install telnet perl libs
+$APT install libnet-telnet-perl &>> $ILOG
+
+# install telnet scripts
+killall telstart.sh 2>/dev/null
+killall telnet.pl 2>/dev/null
+cp $THISLAB/scripts/telnet.pl /usr/local/bin/
+sudo chmod 755 /usr/local/bin/telnet.pl
+cp $THISLAB/scripts/telstart.sh /usr/local/bin/
+sudo chmod 755 /usr/local/bin/telstart.sh
+
+# start a few telnet scripts
+pushd /usr/local/bin
+for i in `seq 1 5`; do
+	./telstart.sh &> /dev/null &
+done
+popd
+
+echo "Adding users..." &>> $ILOG
+useradd jimbo  &>> $ILOG
+echo "jimbo:goofy76" | chpasswd  &>> $ILOG
+useradd jambo &>> $ILOG
+echo "jambo:minnie77" | chpasswd &>> $ILOG
+useradd jumbo &>> $ILOG
+echo "jumbo:donald78" | chpasswd &>> $ILOG
+
+# install stock ticker CGI script
+mkdir /usr/lib/cgi-bin
+chmod 755 /usr/lib/cgi-bin
+cp $THISLAB/scripts/stock.* /usr/lib/cgi-bin/
+sudo chown www-data:www-data /usr/lib/cgi-bin/stock.*
+sudo chmod 755 /usr/lib/cgi-bin/stock.*
+cp $THISLAB/htdocs/bob-index.html /var/www/html/index.html
+
+echo "Success! Creating success stamp." &>> $ILOG
+
+CreateStamp
+
+echo ">>> Configuration complete." &>> $ILOG
+
+YesLogin
+
+# unmount source files
+if [ $DEBUG -eq 0 ] # do this only if "for reals"
+then
+	rm -rf /tmp/bob/*
+fi
+
+if [ $KEEPLOG -eq 0 ]
+then
+	rm $ILOG
+fi
