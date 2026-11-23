@@ -78,21 +78,30 @@ ln -sf /sbin/ifconfig /usr/bin/ifconfig
 
 # dpkg can mark tcpdump "installed" without the actual binary ever
 # landing on disk (seen on this testbed - likely the same dpkg-lock
-# contention guarded against above, slipping through once). A plain
-# `ln -sf` doesn't check its target exists, so verify the real binary
-# is actually there first and force a reinstall if not, rather than
-# silently symlinking to nothing.
-if [ ! -f /usr/sbin/tcpdump ]
-then
-	echo "tcpdump binary missing despite dpkg believing it's installed - forcing reinstall..." >> $ILOG 2>&1
+# contention guarded against above). A single reinstall attempt
+# proved unreliable - it can race a lock-timeout boundary and give up
+# right before whatever was holding the lock actually finishes - so
+# retry a few times with a short pause rather than failing after one
+# shot. A plain `ln -sf` doesn't check its target exists either, so
+# verify the real binary is actually there before symlinking it.
+TCPDUMP_TRIES=0
+while [ ! -f /usr/sbin/tcpdump ] && [ $TCPDUMP_TRIES -lt 3 ]
+do
+	TCPDUMP_TRIES=$((TCPDUMP_TRIES + 1))
+	echo "tcpdump binary missing despite dpkg believing it's installed - forcing reinstall (attempt $TCPDUMP_TRIES)..." >> $ILOG 2>&1
 	$APT install --reinstall tcpdump >> $ILOG 2>&1
-fi
+	[ ! -f /usr/sbin/tcpdump ] && sleep 10
+done
 
 if [ -f /usr/sbin/tcpdump ]
 then
 	ln -sf /usr/sbin/tcpdump /usr/bin/tcpdump
+	# let students run tcpdump without sudo - CAP_NET_RAW is required
+	# to open a packet socket at all; CAP_NET_ADMIN is needed for
+	# promiscuous-mode capture, which this lab's sniffing relies on.
+	sudo setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump >> $ILOG 2>&1
 else
-	echo "ERROR: tcpdump still missing after reinstall attempt - see $ILOG" | tee -a $ILOG
+	echo "ERROR: tcpdump still missing after $TCPDUMP_TRIES reinstall attempts - see $ILOG" | tee -a $ILOG
 fi
 
 # Disable segmentation offload (GSO/TSO/GRO/LRO) on the 10.x lab
@@ -139,9 +148,25 @@ fi
 echo "Copy sample ettercap file..."
 cp $THISLAB/scripts/remote.ef /root/
 
-# Getting the ettercap installation script over.
-chmod a+x $THISLAB/scripts/install-ettercap.sh
-cp /tmp/install-ettercap.sh /home/umdclass*
+# Copy install_ettercap.sh into the student's home directory so it's
+# ready to run by hand after this script finishes. /home always has
+# exactly two directories here: "test" and the actual student account
+# (its name varies per user/swap-in), so pick whichever one isn't
+# "test" rather than hardcoding a username.
+STUDENT_HOME=$(find /home -mindepth 1 -maxdepth 1 -type d ! -name test | head -1)
+
+if [ -n "$STUDENT_HOME" ]
+then
+	echo "Copying install_ettercap.sh to $STUDENT_HOME..." >> $ILOG 2>&1
+	cp $THISLAB/scripts/install_ettercap.sh "$STUDENT_HOME/"
+	chmod +x "$STUDENT_HOME/install_ettercap.sh"
+	# best-effort: hand ownership to the student account if its
+	# username matches the directory name (the usual convention) -
+	# harmless no-op if it doesn't
+	chown "$(basename "$STUDENT_HOME")":"$(basename "$STUDENT_HOME")" "$STUDENT_HOME/install_ettercap.sh" 2>/dev/null
+else
+	echo "WARNING: could not find the student home directory under /home (expected one directory other than 'test') - install_ettercap.sh was NOT copied, do it by hand" | tee -a $ILOG
+fi
 
 echo "Success! Installation complete." >> $ILOG 2>&1
 
