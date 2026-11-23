@@ -100,6 +100,9 @@ for dir in $(find . -maxdepth 1 -type d -name "*jup"); do
     mv $dir_name $EDUCATION
 done
 
+# This lab doesn't have a Jupyter Notebook. Might add to deter-project/education soon.
+mv mitm/ $EDUCATION
+
 # Move the grades back for the student.
 [ -f /tmp/"${USER}_logs.txt" ] && mv /tmp/"${USER}_logs.txt" $EDUCATION
 
