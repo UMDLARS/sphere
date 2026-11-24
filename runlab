@@ -14,7 +14,7 @@ if [ $# -lt 1 ] ; then
    exit 1;
 fi
 lab=${@: -1} 
-labpath="/home/umdclasscdxx/.education/$lab"
+labpath="/home/USERNAME_GOES_HERE/.education/$lab"
 while getopts ${OPTSTRING} opt; do
    case ${opt} in
       o)
@@ -36,14 +36,5 @@ for n in `cat $labpath/nodes` ; do
     ssh -o StrictHostKeyChecking=no $n "cd /tmp/$n; sudo bash install" &
 done
 
-# Wait for every backgrounded per-node install above to actually
-# finish before this script exits. Without this, runlab returns your
-# prompt the instant all the ssh commands are LAUNCHED, not when
-# they're done - the remote installs (eve's especially, with its long
-# package loop) keep running for real afterward, with their output
-# still landing on this same terminal well after you've gotten your
-# prompt back. That's what looked like a hang needing an Enter press:
-# it was background output overwriting an already-returned prompt
-# line, not the script actually being stuck.
 wait
 echo ">>> All node installs finished."
